@@ -22,6 +22,7 @@ def generate_diff(config):
     Unit_cell = np.fft.fftn(unit_cell, config['detector']['shape'])
 
     Solid_unit = np.fft.fftn(solid_unit, config['detector']['shape'])
+    solid_unit_expanded = np.fft.ifftn(Solid_unit)
 
     N   = config['disorder']['n']
     exp = make_exp(config['disorder']['sigma'], config['detector']['shape'])
@@ -30,7 +31,7 @@ def generate_diff(config):
     
     diff  = N * exp * np.abs(lattice * Unit_cell)**2 
     diff += (1. - exp) * np.abs(Solid_unit)**2 
-    return diff
+    return diff, solid_unit_expanded
 
 
 
@@ -43,7 +44,9 @@ if __name__ == "__main__":
     params = parse_parameters(config)
 
     # forward problem
-    diff = generate_diff(params)
+    diff, solid_unit = generate_diff(params)
 
     # inverse problem
-    phase(diff, params)
+    solid_support = solid_unit > 1.0e-1
+    solid_ret, diff_ret = phase(diff, solid_support, params, solid_known = solid_unit)
+

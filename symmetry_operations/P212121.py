@@ -1,6 +1,6 @@
 import numpy as np
 
-name = 'P1'
+name = 'P212121'
 
 def solid_syms(solid_unit, unitcell_size, det_shape):
     """
