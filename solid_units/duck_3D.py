@@ -44,6 +44,9 @@ def make_3D_duck(shape = (12, 25, 30)):
 
     # now interpolate the duck onto the required grid
     duck3d = interp_3d(duck3d, shape)
+
+    # get rid of the crap
+    duck3d[np.where(duck3d < 0.1)] = 0.0
     return duck3d
         
 if __name__ == '__main__':

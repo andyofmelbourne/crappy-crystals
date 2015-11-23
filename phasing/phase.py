@@ -1,12 +1,3 @@
-"""
-o                                            the solid unit
-os = o(R1 . x + T1), o(R2 . x + T2), ...     the symmetry related coppies of o
-Os = e^{T1} O(R1 . q), e^{T2} O(R2 . q), ... the symmetry related coppies of o at the detector
-
-modes = 
-
-u = sum_i o(Ri . x + Ti)    the unit cell
-"""
 import numpy as np
 
 from utils.disorder      import make_exp
@@ -68,16 +59,26 @@ class Mappings():
         return diff
 
 
-def _Pmod(modes, diff, M, alpha = 1.0e-10):
+def _Pmod(modes, diff, M, good_pix, alpha = 1.0e-10):
     
-    modes = modes * np.sqrt(diff) / (np.sqrt(M) + alpha)
+    #print modes.shape
+    #modes[0,good_pix] = modes[0,good_pix] * np.sqrt(diff[good_pix]) / (np.sqrt(M[good_pix]) + alpha)
+    modes = modes * (~good_pix + good_pix * np.sqrt(diff) / (np.sqrt(M) + alpha))
     
     return modes
 
 
-def phase(I, solid_support, params, solid_known = None):
+def phase(I, solid_support, params, good_pix = None, solid_known = None):
     """
     """
+    if good_pix is None :
+        #good_pix = np.where(I > -1)
+        good_pix = I > -1
+    else :
+        pass
+        #good_pix = np.where(good_pix)
+        #good_pix = np.where(good_pix)
+
     maps = Mappings(params)
     
     def Pmod(x):
@@ -87,7 +88,7 @@ def phase(I, solid_support, params, solid_known = None):
         modes --> O
         """
         solid_syms = maps.solid_syms(x)
-        solid_syms = _Pmod(solid_syms, I, maps.make_diff(solid_syms = solid_syms))
+        solid_syms = _Pmod(solid_syms, I, maps.make_diff(solid_syms = solid_syms), good_pix)
         x          = maps.isolid_syms(solid_syms)
         return x
 
@@ -97,7 +98,7 @@ def phase(I, solid_support, params, solid_known = None):
         
         # apply reality
         y.imag = 0.0
-
+        
         # apply positivity
         y[np.where(y<0)] = 0.0
         return y
