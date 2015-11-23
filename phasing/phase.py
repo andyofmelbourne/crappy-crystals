@@ -107,6 +107,8 @@ def phase(I, solid_support, params, good_pix = None, solid_known = None):
     
     ERA = lambda x : Psup(Pmod(x))
     HIO = lambda x : bg.HIO(x.copy(), Pmod, Psup, beta=1.)
+    DM  = lambda x : bg.DM(x, Pmod, Psup, beta=1.0)
+    DM_to_sol = lambda x : bg.DM_to_sol(x, Pmod, Psup, beta=1.0)
 
     iters = 500
     e_mod = []
@@ -116,19 +118,37 @@ def phase(I, solid_support, params, good_pix = None, solid_known = None):
     print 'alg: progress iteration modulus error fidelty'
     x = np.random.random(solid_support.shape) + 0.0J
     for i in range(iters):
+        x = DM(x)
+        x_sol = DM_to_sol(x)
+        
+        # calculate the fidelity and modulus error
+        M = maps.make_diff(solid = x_sol)
+        e_mod.append(bg.l2norm(np.sqrt(I), np.sqrt(M)))
+        #e_sup.append(bg.l2norm(x, Psup(x_sol)))
+        if solid_known is not None :
+            e_fid.append(bg.l2norm(solid_known + 0.0J, x_sol))
+        else :
+            e_fid.append(-1)
+        
+        bg.update_progress(i / max(1.0, float(iters-1)), 'DM', i, e_mod[-1], e_fid[-1])
+
+    """
+    x = np.random.random(solid_support.shape) + 0.0J
+    for i in range(iters):
         x = HIO(x)
         
         # calculate the fidelity and modulus error
         M = maps.make_diff(solid = x)
         e_mod.append(bg.l2norm(np.sqrt(I), np.sqrt(M)))
-        e_sup.append(bg.l2norm(x, Psup(x)))
+        #e_sup.append(bg.l2norm(x, Psup(x)))
         if solid_known is not None :
             e_fid.append(bg.l2norm(solid_known + 0.0J, x))
         else :
             e_fid.append(-1)
         
         bg.update_progress(i / max(1.0, float(iters-1)), 'HIO', i, e_mod[-1], e_fid[-1])
-    
+    """
+
     iters = 100
     for i in range(iters):
         x = ERA(x)

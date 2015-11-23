@@ -1382,3 +1382,25 @@ def HIO(exit, Pmod, Psup, beta=1.):
     out = Pmod(exit)
     out = exit + beta * Psup( (1+1/beta)*out - 1/beta * exit ) - beta * out  
     return out
+
+def DM(psi, Pmod, Psup, beta=0.7):
+    """
+    psi_j+1 = psi_j - Ps psi_j - Pm psi_j
+            + b(1+1/b) Ps Pm psi_j
+            - b(1-1/b) Pm Ps psi_j
+    """
+    psi_M = psi.copy()
+    psi_M = Pmod(psi_M)
+    psi_S = Psup(psi)
+    psi  -= psi_M + psi_S
+    psi  += Psup(beta * (1. + 1. / beta) * psi_M)
+    psi_S = Pmod(psi_S)
+    psi  -= beta * (1. - 1. / beta) * psi_S
+    return psi
+
+def DM_to_sol(psi, Pmod, Psup, beta):
+    psi_M = psi.copy()
+    psi_M = Pmod(psi_M)
+    psi_M = (1. + 1./beta) * psi_M - 1./beta * psi
+    psi_M = Psup(psi_M)
+    return psi_M

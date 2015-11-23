@@ -63,5 +63,5 @@ if __name__ == "__main__":
 
     # inverse problem
     solid_ret, diff_ret = phase(diff, support, params, \
-                                good_pix = beamstop, solid_known = solid_unit)
+                                good_pix = beamstop + edges, solid_known = solid_unit)
 
