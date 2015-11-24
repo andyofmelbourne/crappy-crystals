@@ -29,6 +29,8 @@ def add_noise_3d(diff, n, is_fft_shifted = True, remove_courners = True):
     else :
         diff_out = diff.copy()
     
+    norm = np.sum(diff)
+    
     mask = np.ones_like(diff, dtype = np.bool)
     
     i = np.fft.fftfreq(diff.shape[0]) * diff.shape[0]
@@ -38,11 +40,6 @@ def add_noise_3d(diff, n, is_fft_shifted = True, remove_courners = True):
     R      = np.sqrt(i**2 + j**2 + k**2)
     R[0, 0, 0] = 0.5
     
-    if remove_courners :
-        l = np.where(R >= np.min(diff.shape) / 2.)
-        diff_out[l] = 0.0
-        mask[l]     = False
-
     # R scaling
     R_scale   = 3. * ((R+1.)**2 - R**2) / ((R+1.)**3 - R**3)
     diff_out  = diff_out * R_scale
@@ -54,9 +51,8 @@ def add_noise_3d(diff, n, is_fft_shifted = True, remove_courners = True):
     # from the mean number of photons per speckle
     # at the edge of the detector
     rav = rad_av(diff_out)
-    N = float(n) / (8. * rav[int(np.min(diff.shape) / 2. - 1.)])
-    N = int(N)
-    print 'total number of photons required:', N
+    N = float(n) / (1. * rav[int(np.min(diff.shape) / 2. - 1.)])
+    print 'total number of photons required:', int(N)
 
     # Poisson sampling
     diff_out = np.random.poisson(lam = N * diff_out).astype(np.float64)
@@ -64,6 +60,15 @@ def add_noise_3d(diff, n, is_fft_shifted = True, remove_courners = True):
     # un-scale
     #R_scale  /= np.mean(R_scale) 
     diff_out /= R_scale
+
+    # renormalise
+    diff_out = diff_out * norm / np.sum(diff_out)
+
+    if remove_courners :
+        l = np.where(R >= np.min(diff.shape) / 2.)
+        diff_out[l] = 0.0
+        mask[l]     = False
+
     return diff_out, mask
 
 def rad_av(diff, rs = None, is_fft_shifted = True):

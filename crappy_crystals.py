@@ -23,19 +23,23 @@ def generate_diff(config):
     elif config['crystal']['space_group'] == 'P212121':
         import symmetry_operations.P212121 as sym_ops 
     
-    unit_cell = sym_ops.unit_cell(solid_unit, config['crystal']['unit_cell'])
-    Unit_cell = np.fft.fftn(unit_cell, config['detector']['shape'])
+    #unit_cell = sym_ops.unit_cell(solid_unit, config['crystal']['unit_cell'])
+    #Unit_cell = np.fft.fftn(unit_cell, config['detector']['shape'])
     
     Solid_unit = np.fft.fftn(solid_unit, config['detector']['shape'])
     solid_unit_expanded = np.fft.ifftn(Solid_unit)
+
+    modes = sym_ops.solid_syms(solid_unit_expanded, \
+                               config['crystal']['unit_cell'], \
+                               config['detector']['shape'])
     
     N   = config['disorder']['n']
     exp = make_exp(config['disorder']['sigma'], config['detector']['shape'])
     
     lattice = sym_ops.lattice(config['crystal']['unit_cell'], config['detector']['shape'])
     
-    diff  = N * exp * np.abs(lattice * Unit_cell)**2 
-    diff += (1. - exp) * np.abs(Solid_unit)**2 
+    diff  = N * exp * np.abs(lattice * np.sum(modes, axis=0)**2)
+    diff += (1. - exp) * np.sum(np.abs(modes)**2, axis=0)
 
     # add noise
     if config['detector']['photons'] is not None :

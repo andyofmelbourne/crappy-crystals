@@ -107,13 +107,15 @@ def phase(I, solid_support, params, good_pix = None, solid_known = None):
     DM  = lambda x : bg.DM(x, Pmod, Psup, beta=1.0)
     DM_to_sol = lambda x : bg.DM_to_sol(x, Pmod, Psup, beta=1.0)
 
-    iters = 100
+    iters = 500
     e_mod = []
     e_sup = []
     e_fid = []
 
     print 'alg: progress iteration modulus error fidelty'
     x = np.random.random(solid_support.shape) + 0.0J
+    x = Psup(x)
+    """
     for i in range(iters):
         x = DM(x)
         x_sol = DM_to_sol(x)
@@ -128,9 +130,8 @@ def phase(I, solid_support, params, good_pix = None, solid_known = None):
             e_fid.append(-1)
         
         bg.update_progress(i / max(1.0, float(iters-1)), 'DM', i, e_mod[-1], e_fid[-1])
-
     """
-    x = np.random.random(solid_support.shape) + 0.0J
+
     for i in range(iters):
         x = HIO(x)
         
@@ -144,7 +145,6 @@ def phase(I, solid_support, params, good_pix = None, solid_known = None):
             e_fid.append(-1)
         
         bg.update_progress(i / max(1.0, float(iters-1)), 'HIO', i, e_mod[-1], e_fid[-1])
-    """
 
     iters = 100
     for i in range(iters):
