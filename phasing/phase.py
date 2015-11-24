@@ -1,7 +1,9 @@
 import numpy as np
+import sys
 
 from utils.disorder      import make_exp
-import bagOfns as bg
+from utils.l2norm        import l2norm
+
 
 class Mappings():
     """
@@ -32,15 +34,6 @@ class Mappings():
         self.lattice    = sym_ops.lattice(params['crystal']['unit_cell'], params['detector']['shape'])
         self.solid_syms = lambda x : sym_ops.solid_syms(x, params['crystal']['unit_cell'], params['detector']['shape'])
 
-    def isolid_syms(self, solid_syms):
-        """
-        if the space group is P1 then
-        this is really easy
-        """
-        if self.sym_ops.name == 'P1':
-            solid = np.fft.ifftn(solid_syms[0])
-        return solid
-
     def modes(self, solid_syms):
         modes = np.zeros((solid_syms.shape[0] + 1,) + solid_syms.shape[1 :], dtype=solid_syms.dtype)
         
@@ -60,15 +53,58 @@ class Mappings():
         diff = np.sum(np.abs(modes)**2, axis=0)
         return diff
 
+def _HIO(exit, Pmod, Psup, beta=1.):
+    out = Pmod(exit)
+    out = exit + beta * Psup( (1+1/beta)*out - 1/beta * exit ) - beta * out  
+    return out
+
+def _DM(psi, Pmod, Psup, beta=0.7):
+    """
+    psi_j+1 = psi_j - Ps psi_j - Pm psi_j
+            + b(1+1/b) Ps Pm psi_j
+            - b(1-1/b) Pm Ps psi_j
+    """
+    psi_M = psi.copy()
+    psi_M = Pmod(psi_M)
+    psi_S = Psup(psi)
+    psi  -= psi_M + psi_S
+    psi  += Psup(beta * (1. + 1. / beta) * psi_M)
+    psi_S = Pmod(psi_S)
+    psi  -= beta * (1. - 1. / beta) * psi_S
+    return psi
+
+def _DM_to_sol(psi, Pmod, Psup, beta):
+    psi_M = psi.copy()
+    psi_M = Pmod(psi_M)
+    psi_M = (1. + 1./beta) * psi_M - 1./beta * psi
+    psi_M = Psup(psi_M)
+    return psi_M
 
 def _Pmod(modes, diff, M, good_pix, alpha = 1.0e-10):
     
-    #print modes.shape
-    #modes[0,good_pix] = modes[0,good_pix] * np.sqrt(diff[good_pix]) / (np.sqrt(M[good_pix]) + alpha)
     modes = modes * (~good_pix + good_pix * np.sqrt(diff) / (np.sqrt(M) + alpha))
     
     return modes
 
+
+def update_progress(progress, algorithm, i, emod, esup):
+    barLength = 15 # Modify this to change the length of the progress bar
+    status = ""
+    if isinstance(progress, int):
+        progress = float(progress)
+    if not isinstance(progress, float):
+        progress = 0
+        status = "error: progress var must be float\r\n"
+    if progress < 0:
+        progress = 0
+        status = "Halt...\r\n"
+    if progress >= 1:
+        progress = 1
+        status = "Done...\r\n"
+    block = int(round(barLength*progress))
+    text = "\r{0}: [{1}] {2}% {3} {4} {5} {6} {7}".format(algorithm, "#"*block + "-"*(barLength-block), int(progress*100), i, emod, esup, status, " " * 5) # this last bit clears the line
+    sys.stdout.write(text)
+    sys.stdout.flush()
 
 def phase(I, solid_support, params, good_pix = None, solid_known = None):
     """
@@ -103,9 +139,9 @@ def phase(I, solid_support, params, good_pix = None, solid_known = None):
     #Psup = lambda x : (x * solid_support).real + 0.0J
     
     ERA = lambda x : Psup(Pmod(x))
-    HIO = lambda x : bg.HIO(x.copy(), Pmod, Psup, beta=1.)
-    DM  = lambda x : bg.DM(x, Pmod, Psup, beta=1.0)
-    DM_to_sol = lambda x : bg.DM_to_sol(x, Pmod, Psup, beta=1.0)
+    HIO = lambda x : _HIO(x.copy(), Pmod, Psup, beta=1.)
+    DM  = lambda x : _DM(x, Pmod, Psup, beta=1.0)
+    DM_to_sol = lambda x : _DM_to_sol(x, Pmod, Psup, beta=1.0)
 
     iters = 500
     e_mod = []
@@ -122,14 +158,14 @@ def phase(I, solid_support, params, good_pix = None, solid_known = None):
         
         # calculate the fidelity and modulus error
         M = maps.make_diff(solid = x_sol)
-        e_mod.append(bg.l2norm(np.sqrt(I), np.sqrt(M)))
-        #e_sup.append(bg.l2norm(x, Psup(x_sol)))
+        e_mod.append(l2norm(np.sqrt(I), np.sqrt(M)))
+        #e_sup.append(l2norm(x, Psup(x_sol)))
         if solid_known is not None :
-            e_fid.append(bg.l2norm(solid_known + 0.0J, x_sol))
+            e_fid.append(l2norm(solid_known + 0.0J, x_sol))
         else :
             e_fid.append(-1)
         
-        bg.update_progress(i / max(1.0, float(iters-1)), 'DM', i, e_mod[-1], e_fid[-1])
+        update_progress(i / max(1.0, float(iters-1)), 'DM', i, e_mod[-1], e_fid[-1])
     """
 
     for i in range(iters):
@@ -137,14 +173,14 @@ def phase(I, solid_support, params, good_pix = None, solid_known = None):
         
         # calculate the fidelity and modulus error
         M = maps.make_diff(solid = x)
-        e_mod.append(bg.l2norm(np.sqrt(I), np.sqrt(M)))
-        #e_sup.append(bg.l2norm(x, Psup(x)))
+        e_mod.append(l2norm(np.sqrt(I), np.sqrt(M)))
+        #e_sup.append(l2norm(x, Psup(x)))
         if solid_known is not None :
-            e_fid.append(bg.l2norm(solid_known + 0.0J, x))
+            e_fid.append(l2norm(solid_known + 0.0J, x))
         else :
             e_fid.append(-1)
         
-        bg.update_progress(i / max(1.0, float(iters-1)), 'HIO', i, e_mod[-1], e_fid[-1])
+        update_progress(i / max(1.0, float(iters-1)), 'HIO', i, e_mod[-1], e_fid[-1])
 
     iters = 100
     for i in range(iters):
@@ -152,14 +188,14 @@ def phase(I, solid_support, params, good_pix = None, solid_known = None):
         
         # calculate the fidelity and modulus error
         M = maps.make_diff(solid = x)
-        e_mod.append(bg.l2norm(np.sqrt(I), np.sqrt(M)))
-        e_sup.append(bg.l2norm(x, Psup(x)))
+        e_mod.append(l2norm(np.sqrt(I), np.sqrt(M)))
+        e_sup.append(l2norm(x, Psup(x)))
         if solid_known is not None :
-            e_fid.append(bg.l2norm(solid_known + 0.0J, x))
+            e_fid.append(l2norm(solid_known + 0.0J, x))
         else :
             e_fid.append(-1)
         
-        bg.update_progress(i / max(1.0, float(iters-1)), 'ERA', i, e_mod[-1], e_fid[-1])
+        update_progress(i / max(1.0, float(iters-1)), 'ERA', i, e_mod[-1], e_fid[-1])
     print '\n'
 
     return x, M
