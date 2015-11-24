@@ -44,7 +44,7 @@ def add_noise_3d(diff, n, is_fft_shifted = True, remove_courners = True):
         mask[l]     = False
 
     # R scaling
-    R_scale   = 3. * ((R+1.)**2 - R**2) / ((R+1)**3 - R**3)
+    R_scale   = 3. * ((R+1.)**2 - R**2) / ((R+1.)**3 - R**3)
     diff_out  = diff_out * R_scale
 
     # normalise

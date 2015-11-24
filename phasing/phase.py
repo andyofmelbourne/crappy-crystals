@@ -20,6 +20,8 @@ class Mappings():
     def __init__(self, params):
         if params['crystal']['space_group'] == 'P1':
             import symmetry_operations.P1 as sym_ops 
+        elif params['crystal']['space_group'] == 'P212121':
+            import symmetry_operations.P212121 as sym_ops 
         self.sym_ops = sym_ops
 
         # in general we have the inchorent mapping
@@ -72,12 +74,7 @@ def phase(I, solid_support, params, good_pix = None, solid_known = None):
     """
     """
     if good_pix is None :
-        #good_pix = np.where(I > -1)
         good_pix = I > -1
-    else :
-        pass
-        #good_pix = np.where(good_pix)
-        #good_pix = np.where(good_pix)
 
     maps = Mappings(params)
     
@@ -88,8 +85,8 @@ def phase(I, solid_support, params, good_pix = None, solid_known = None):
         modes --> O
         """
         solid_syms = maps.solid_syms(x)
-        solid_syms = _Pmod(solid_syms, I, maps.make_diff(solid_syms = solid_syms), good_pix)
-        x          = maps.isolid_syms(solid_syms)
+        x = _Pmod(solid_syms[0], I, maps.make_diff(solid_syms = solid_syms), good_pix)
+        x = np.fft.ifftn(x)
         return x
 
     def Psup(x):
@@ -110,7 +107,7 @@ def phase(I, solid_support, params, good_pix = None, solid_known = None):
     DM  = lambda x : bg.DM(x, Pmod, Psup, beta=1.0)
     DM_to_sol = lambda x : bg.DM_to_sol(x, Pmod, Psup, beta=1.0)
 
-    iters = 500
+    iters = 100
     e_mod = []
     e_sup = []
     e_fid = []
