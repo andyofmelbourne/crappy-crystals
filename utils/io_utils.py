@@ -3,7 +3,7 @@ import numpy as np
 def parse_cmdline_args():
     import argparse
     import os
-    parser = argparse.ArgumentParser(prog = 'phase.py', description='phase a translationally disordered crystal')
+    parser = argparse.ArgumentParser(prog = 'crappy-crystals.py', description='phase a translationally disordered crystal')
     parser.add_argument('config', type=str, \
                         help="file name of the configuration file")
     args = parser.parse_args()
@@ -11,6 +11,15 @@ def parse_cmdline_args():
     # check that args.ini exists
     if not os.path.exists(args.config):
         raise NameError('config file does not exist: ' + args.config)
+    return args
+
+def parse_cmdline_args_phasing():
+    import argparse
+    import os
+    parser = argparse.ArgumentParser(prog = 'phase.py', description='phase a translationally disordered crystal')
+    parser.add_argument('input', type=str, \
+                        help="h5 file name of the input file")
+    args = parser.parse_args()
     return args
 
 
@@ -69,3 +78,91 @@ def parse_parameters(config):
                         pass
 
     return monitor_params
+
+def if_exists_del(fnam):
+    import os
+    # check that the directory exists and is a directory
+    output_dir = os.path.split( os.path.realpath(fnam) )[0]
+    if os.path.exists(output_dir) == False :
+        raise ValueError('specified path does not exist: ', output_dir)
+    
+    if os.path.isdir(output_dir) == False :
+        raise ValueError('specified path is not a path you dummy: ', output_dir)
+    
+    # see if it exists and if so delete it 
+    # (probably dangerous but otherwise this gets really anoying for debuging)
+    if os.path.exists(fnam):
+        print '\n', fnam ,'file already exists, deleting the old one and making a new one'
+        os.remove(fnam)
+
+def write_output_h5(path, diff, diff_ret, support, support_ret, \
+        good_pix, solid_unit, solid_unit_ret, emod, efid, config):
+    import os, h5py
+    fnam = os.path.join(path, 'output.h5')
+    if_exists_del(fnam)
+    
+    f = h5py.File(fnam, 'w')
+    f.create_dataset('data', data = diff)
+    f.create_dataset('data retrieved', data = diff_ret)
+    f.create_dataset('sample support', data = support.astype(np.int16))
+    f.create_dataset('sample support retrieved', data = support_ret.astype(np.int16))
+    f.create_dataset('good pixels', data = good_pix.astype(np.int16))
+    f.create_dataset('modulus error', data = emod)
+    f.create_dataset('fidelity error', data = efid)
+    f.create_dataset('solid unit init', data = solid_unit)
+    f.create_dataset('solid unit retrieved', data = solid_unit_ret)
+    # read the config file and dump it into the h5 file
+    g = open(config).readlines()
+    h = ''
+    for line in g:
+        h += line
+    f.create_dataset('config file', data = np.array(h))
+    f.close()
+    return 
+
+def write_input_h5(path, diff, support, good_pix, solid_known, config):
+    import os, h5py
+    fnam = os.path.join(path, 'input.h5')
+    if_exists_del(fnam)
+    
+    f = h5py.File(fnam, 'w')
+    f.create_dataset('data', data = diff)
+    f.create_dataset('sample support', data = support.astype(np.int16))
+    f.create_dataset('good pixels', data = good_pix.astype(np.int16))
+    if solid_known is not None :
+        f.create_dataset('solid unit', data = solid_known)
+    # read the config file and dump it into the h5 file
+    g = open(config).readlines()
+    h = ''
+    for line in g:
+        h += line
+    f.create_dataset('config file', data = np.array(h))
+    f.close()
+    return 
+
+def read_input_h5(fnam):
+    import h5py
+    
+    f = h5py.File(fnam, 'r')
+    diff     = f['data'].value
+    support  = f['sample support'].value.astype(np.bool)
+    good_pix = f['good pixels'].value.astype(np.bool)
+    
+    if 'solid unit' in f.keys():
+        solid_known = f['solid unit'].value
+    else :
+        solid_known = None
+
+    config_file = f['config file'].value
+
+    f.close()
+
+    # read then pass the config file
+    import ConfigParser
+    import StringIO
+    config_file = StringIO.StringIO(config_file)
+
+    config = ConfigParser.ConfigParser()
+    config.readfp(config_file)
+    params = parse_parameters(config)
+    return diff, support, good_pix, solid_known, params

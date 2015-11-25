@@ -53,12 +53,12 @@ class Mappings():
         diff = np.sum(np.abs(modes)**2, axis=0)
         return diff
 
-def _HIO(exit, Pmod, Psup, beta=1.):
+def HIO_(exit, Pmod, Psup, beta=1.):
     out = Pmod(exit)
     out = exit + beta * Psup( (1+1/beta)*out - 1/beta * exit ) - beta * out  
     return out
 
-def _DM(psi, Pmod, Psup, beta=0.7):
+def DM_(psi, Pmod, Psup, beta=0.7):
     """
     psi_j+1 = psi_j - Ps psi_j - Pm psi_j
             + b(1+1/b) Ps Pm psi_j
@@ -73,14 +73,14 @@ def _DM(psi, Pmod, Psup, beta=0.7):
     psi  -= beta * (1. - 1. / beta) * psi_S
     return psi
 
-def _DM_to_sol(psi, Pmod, Psup, beta):
+def DM_to_sol_(psi, Pmod, Psup, beta):
     psi_M = psi.copy()
     psi_M = Pmod(psi_M)
     psi_M = (1. + 1./beta) * psi_M - 1./beta * psi
     psi_M = Psup(psi_M)
     return psi_M
 
-def _Pmod(modes, diff, M, good_pix, alpha = 1.0e-10):
+def Pmod_(modes, diff, M, good_pix, alpha = 1.0e-10):
     
     modes = modes * (~good_pix + good_pix * np.sqrt(diff) / (np.sqrt(M) + alpha))
     
@@ -139,9 +139,9 @@ def phase(I, solid_support, params, good_pix = None, solid_known = None):
     #Psup = lambda x : (x * solid_support).real + 0.0J
     
     ERA = lambda x : Psup(Pmod(x))
-    HIO = lambda x : _HIO(x.copy(), Pmod, Psup, beta=1.)
-    DM  = lambda x : _DM(x, Pmod, Psup, beta=1.0)
-    DM_to_sol = lambda x : _DM_to_sol(x, Pmod, Psup, beta=1.0)
+    HIO = lambda x : HIO_(x.copy(), Pmod, Psup, beta=1.)
+    DM  = lambda x : DM_(x, Pmod, Psup, beta=1.0)
+    DM_to_sol = lambda x : DM_to_sol_(x, Pmod, Psup, beta=1.0)
 
     iters = 500
     e_mod = []

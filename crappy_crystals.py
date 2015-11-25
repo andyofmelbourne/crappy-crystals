@@ -1,16 +1,17 @@
 #!/usr/bin/env python
 
 import sys
-import os.path
+import os
 import ConfigParser
 import numpy as np
+import subprocess
 
 sys.path.append('.')
-from phasing.phase       import phase
 from solid_units.duck_3D import make_3D_duck
 from utils.disorder      import make_exp
 from utils.io_utils      import parse_parameters
 from utils.io_utils      import parse_cmdline_args
+from utils.io_utils      import write_input_h5
 from utils.add_noise_3d  import add_noise_3d
 from utils.padding       import expand_region_by
 from utils.beamstop      import make_beamstop
@@ -64,7 +65,6 @@ def generate_diff(config):
     return diff, beamstop, edges, support, solid_unit_expanded
 
 
-
 if __name__ == "__main__":
     args = parse_cmdline_args()
     
@@ -72,11 +72,18 @@ if __name__ == "__main__":
     config.read(args.config)
     
     params = parse_parameters(config)
-
+    
     # forward problem
-    diff, beamstop, edges, support, solid_unit = generate_diff(params)
+    if params['simulation']['sample'] == 'duck':
+        diff, beamstop, edges, support, solid_unit = generate_diff(params)
+        
+        # write to file
+        write_input_h5(params['output']['path'], diff, support, \
+                beamstop + edges, solid_unit, args.config)
 
     # inverse problem
-    solid_ret, diff_ret = phase(diff, support, params, \
-                                good_pix = beamstop + edges, solid_known = solid_unit)
+    runstr = "python " + params['phasing']['script'] + ' ' + \
+                     os.path.join(params['output']['path'],'input.h5')
+    print '\n',runstr
+    subprocess.call([runstr], shell=True)
 
