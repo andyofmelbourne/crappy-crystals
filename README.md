@@ -29,5 +29,10 @@ cd crappy-crystals
 ./crappy_crystals.py examples/example_duck_P1/config.ini
 ```
 
+To display the ouput:
+```
+python utils/display.py examples/example_duck_P1/output.h5
+```
+
 ### Based on the paper
 - Awesome Nature paper yet to be published...
