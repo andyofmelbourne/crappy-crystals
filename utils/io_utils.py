@@ -96,7 +96,7 @@ def if_exists_del(fnam):
         os.remove(fnam)
 
 def write_output_h5(path, diff, diff_ret, support, support_ret, \
-        good_pix, solid_unit, solid_unit_ret, emod, efid, config):
+        good_pix, solid_unit, solid_unit_ret, emod, efid):
     import os, h5py
     fnam = os.path.join(path, 'output.h5')
     if_exists_del(fnam)
@@ -111,14 +111,48 @@ def write_output_h5(path, diff, diff_ret, support, support_ret, \
     f.create_dataset('fidelity error', data = efid)
     f.create_dataset('solid unit init', data = solid_unit)
     f.create_dataset('solid unit retrieved', data = solid_unit_ret)
+
     # read the config file and dump it into the h5 file
+    """
     g = open(config).readlines()
     h = ''
     for line in g:
         h += line
     f.create_dataset('config file', data = np.array(h))
+    """
     f.close()
     return 
+
+def read_output_h5(path):
+    import os, h5py
+    f = h5py.File(path, 'r')
+    diff           = f['data'].value
+    diff_ret       = f['data retrieved'].value
+    support        = f['sample support'].value.astype(np.bool)
+    support_ret    = f['sample support retrieved'].value.astype(np.bool)
+    good_pix       = f['good pixels'].value.astype(np.bool)
+    emod           = f['modulus error'].value
+    efid           = f['fidelity error'].value
+    solid_unit     = f['solid unit init'].value
+    solid_unit_ret = f['solid unit retrieved'].value
+    config_file    = f['config file'].value
+
+    f.close()
+
+    # read then pass the config file
+    """
+    import ConfigParser
+    import StringIO
+    config_file = StringIO.StringIO(config_file)
+
+    config = ConfigParser.ConfigParser()
+    config.readfp(config_file)
+    params = parse_parameters(config)
+    """
+    
+    return diff, diff_ret, support, support_ret, \
+        good_pix, solid_unit, solid_unit_ret, emod, efid
+
 
 def write_input_h5(path, diff, support, good_pix, solid_known, config):
     import os, h5py
@@ -139,6 +173,7 @@ def write_input_h5(path, diff, support, good_pix, solid_known, config):
     f.create_dataset('config file', data = np.array(h))
     f.close()
     return 
+
 
 def read_input_h5(fnam):
     import h5py

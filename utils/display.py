@@ -6,6 +6,8 @@ import numpy as np
 import signal
 import sys
 
+from io_utils import read_output_h5
+
 def show_vol(map_3d):
     signal.signal(signal.SIGINT, signal.SIG_DFL)    # allow Control-C
     app = QtGui.QApplication(sys.argv)
@@ -52,14 +54,99 @@ class Show_vol(QtGui.QWidget):
         self.show()
 
 
-"""
+class Application():
+
+    def __init__(self, diff, diff_ret, support, support_ret, \
+                 good_pix, solid_unit, solid_unit_ret,       \
+                 emod, efid):
+        
+        solid_unit_ret = np.fft.ifftshift(solid_unit_ret.real)
+        duck_plots = (np.sum(solid_unit_ret, axis=0),\
+                      np.sum(solid_unit_ret, axis=1),\
+                      np.sum(solid_unit_ret, axis=2))
+
+        duck_plots = np.hstack(duck_plots)
+        
+        diff_plots = np.hstack((np.fft.ifftshift(diff[0, :, :]), \
+                                np.fft.ifftshift(diff[:, 0, :]), \
+                                np.fft.ifftshift(diff[:, :, 0])))
+        diff_plots = diff_plots**0.2
+        
+        # Always start by initializing Qt (only once per application)
+        app = QtGui.QApplication([])
+
+        # Define a top-level widget to hold everything
+        w = QtGui.QWidget()
+
+        # 2D projection images for the sample
+        self.duck_plots = pg.ImageView()
+
+        # 2D slices for the diffraction volume
+        self.diff_plots = pg.ImageView()
+
+        # line plots of the error metrics
+        self.plot_emod = pg.PlotWidget()
+        self.plot_efid = pg.PlotWidget()
+         
+        Vsplitter = QtGui.QSplitter(QtCore.Qt.Vertical) 
+
+        # ducks
+        Vsplitter.addWidget(self.duck_plots)
+        
+        # diffs
+        Vsplitter.addWidget(self.diff_plots)
+        
+        # errors
+        Hsplitter = QtGui.QSplitter(QtCore.Qt.Horizontal)
+        Hsplitter.addWidget(self.plot_emod)
+        Hsplitter.addWidget(self.plot_efid)
+        Vsplitter.addWidget(Hsplitter)
+        
+        hlayout_tot = QtGui.QHBoxLayout()
+        hlayout_tot.addWidget(Vsplitter)
+
+        w.setLayout(hlayout_tot)
+
+        self.duck_plots.setImage(duck_plots.T)
+        self.diff_plots.setImage(diff_plots.T)
+        self.plot_emod.plot(emod)
+        self.plot_emod.setTitle('Modulus error l2norm:')
+        self.plot_efid.plot(efid)
+        self.plot_efid.setTitle('Fidelity error l2norm:')
+        
+        ## Display the widget as a new window
+        w.show()
+
+        ## Start the Qt event loop
+        app.exec_()
+        
+        
+def parse_cmdline_args():
+    import argparse
+    import os
+    parser = argparse.ArgumentParser(prog = 'display.py', description='display the contents of output.h5 in a GUI')
+    parser.add_argument('path', type=str, \
+                        help="path to output.h5 file")
+    args = parser.parse_args()
+
+    # check that args.ini exists
+    if not os.path.exists(args.path):
+        raise NameError('output h5 file does not exist: ' + args.path)
+    return args
+
+
+
 if __name__ == '__main__':
-    config = ConfigParser.ConfigParser()
-    config.read(sys.argv[1])
-    params = io_utils.parse_parameters(config)
+    args = parse_cmdline_args()
+    
+    # read the h5 file 
+    diff, diff_ret, support, support_ret, \
+    good_pix, solid_unit, solid_unit_ret, \
+    emod, efid                             = read_output_h5(args.path)
     
     signal.signal(signal.SIGINT, signal.SIG_DFL)    # allow Control-C
     app = QtGui.QApplication(sys.argv)
-    ex  = Application(params)
+    ex  = Application(diff, diff_ret, support, support_ret, \
+                      good_pix, solid_unit, solid_unit_ret, \
+                      emod, efid)
     sys.exit(app.exec_())
-"""

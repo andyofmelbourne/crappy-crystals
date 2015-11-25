@@ -102,7 +102,7 @@ if __name__ == "__main__":
     
     solid_ret, diff_ret, emod, efid = phase(diff, support, params, \
                                 good_pix = good_pix, solid_known = solid_known)
-
+    
     # write the h5 file 
     write_output_h5(params['output']['path'], diff, diff_ret, support, \
-                    support, good_pix, solid_known, solid_ret, emod, efid, args.input)
+                    support, good_pix, solid_known, solid_ret, emod, efid)
