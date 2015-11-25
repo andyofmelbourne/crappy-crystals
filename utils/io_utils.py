@@ -135,7 +135,7 @@ def read_output_h5(path):
     efid           = f['fidelity error'].value
     solid_unit     = f['solid unit init'].value
     solid_unit_ret = f['solid unit retrieved'].value
-    config_file    = f['config file'].value
+    #config_file    = f['config file'].value
 
     f.close()
 
