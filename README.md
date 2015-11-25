@@ -24,6 +24,8 @@ optional arguments:
 
 ### Example
 ```
+git clone https://github.com/andyofmelbourne/crappy-crystals.git
+cd crappy-crystals
 ./crappy_crystals.py examples/example_duck_P1/config.ini
 ```
 
