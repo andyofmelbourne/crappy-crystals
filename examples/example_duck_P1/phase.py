@@ -4,6 +4,7 @@ import os
 import ConfigParser
 
 sys.path.append(os.path.abspath('.'))
+print sys.path
 
 from utils.disorder      import make_exp
 from utils.l2norm        import l2norm
