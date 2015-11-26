@@ -34,5 +34,20 @@ To display the ouput:
 python utils/display.py examples/example_duck_P1/output.h5
 ```
 
+
+### At CFEL?
+Do:
+```
+ssh -X it-hpc-cxi01
+module load python/2.7
+```
+before executing the example above. Note that pyqtgraph
+is not installed so you will need to use sshfs or copy
+the files to your computer before running:
+```
+python utils/display.py examples/example_duck_P1/output.h5
+```
+
+
 ### Based on the paper
 - Awesome Nature paper yet to be published...
