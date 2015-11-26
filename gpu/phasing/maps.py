@@ -15,7 +15,7 @@ class Mappings():
         store needed dummy arrays on the gpu.
         """
         shape = params['detector']['shape']
-        dtype = np.dtype(params['phasing']['dtype']
+        dtype = np.dtype(params['phasing']['dtype'])
         
         # get the CUDA platform
         platforms = pyopencl.get_platforms()
