@@ -82,9 +82,6 @@ def phase(I, solid_support, params, good_pix = None, solid_known = None):
     
     maps.duck_known = pyopencl.array.to_device(maps.queue, np.ascontiguousarray(solid_known.astype(maps.duck.dtype)))
 
-    print maps.duck_known.reverse()
-
-    """
     maps.dummy_comp = maps.duck_known.copy()
     maps.plan.execute(maps.dummy_comp.data)
     M = maps.make_diff(maps.dummy_comp)
@@ -113,7 +110,6 @@ def phase(I, solid_support, params, good_pix = None, solid_known = None):
         
         update_progress(i / max(1.0, float(iters-1)), 'ERA', i, e_mod[-1], e_fid[-1])
     print '\n'
-    """
     return maps.duck.get(), M.get(), e_mod, e_fid
 
 
