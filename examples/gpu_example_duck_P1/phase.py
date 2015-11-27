@@ -92,7 +92,7 @@ def phase(I, solid_support, params, good_pix = None, solid_known = None):
     e_sup = []
     e_fid = []
     
-    iters = 100
+    iters = params['phasing']['ERA']
     for i in range(iters):
         maps.duck = maps.ERA(maps.duck)
         

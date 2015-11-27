@@ -37,17 +37,17 @@ def solid_syms(solid_unit, unitcell_size, det_shape):
     # x = 0.5 + x, 0.5 - y, -z
     temp  = unitcell[::, ::-1, ::-1].copy()
     temp *= T_fourier(temp.shape, [unitcell_size[0]/2., unitcell_size[1]/2., 0.0])
-    modes.append(temp)
+    modes.append(temp.copy())
     
     # x = -x, 0.5 + y, 0.5 - z
     temp  = unitcell[::-1, ::, ::-1].copy()
     temp *= T_fourier(temp.shape, [0.0, unitcell_size[1]/2., unitcell_size[2]/2.])
-    modes.append(temp)
+    modes.append(temp.copy())
 
     # x = 0.5 - x, -y, 0.5 + z
     temp  = unitcell[::-1, ::-1, ::].copy()
     temp *= T_fourier(temp.shape, [unitcell_size[0]/2., 0.0, unitcell_size[2]/2.])
-    modes.append(temp)
+    modes.append(temp.copy())
     return np.array(modes)
 
 

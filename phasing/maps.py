@@ -22,8 +22,10 @@ class Mappings():
     def __init__(self, params):
         if params['crystal']['space_group'] == 'P1':
             import symmetry_operations.P1 as sym_ops 
+            print '\ncrystal space group: P1'
         elif params['crystal']['space_group'] == 'P212121':
             import symmetry_operations.P212121 as sym_ops 
+            print '\ncrystal space group: P2121'
         self.sym_ops = sym_ops
 
         # in general we have the inchorent mapping
