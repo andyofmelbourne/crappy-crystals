@@ -40,10 +40,13 @@ Do:
 ```
 ssh -X it-hpc-cxi01
 module load python/2.7
+module load opencl/intel
+export PYTHONPATH=/afs/desy.de/user/a/amorgan/python_packages/lib/python2.7/site-packages/:$PYTHONPATH
+./crappy_crystals.py examples/gpu_example_duck_P1/config.ini
 ```
-before executing the example above. Note that pyqtgraph
-is not installed so you will need to use sshfs or copy
-the files to your computer before running:
+Note that pyqtgraph is not installed so you will 
+need to use sshfs or copy the files to your computer 
+before running:
 ```
 python utils/display.py examples/example_duck_P1/output.h5
 ```
