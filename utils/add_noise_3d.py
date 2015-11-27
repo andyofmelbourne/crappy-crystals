@@ -1,6 +1,6 @@
 import numpy as np
 
-def add_noise_3d(diff, n, is_fft_shifted = True, remove_courners = True):
+def add_noise_3d(diff, n, is_fft_shifted = True, remove_courners = True, unit_cell_size=None):
     """
     Add Poisson noise to a 3d volume.
 
@@ -50,9 +50,16 @@ def add_noise_3d(diff, n, is_fft_shifted = True, remove_courners = True):
     # calculate the total number of photons
     # from the mean number of photons per speckle
     # at the edge of the detector
+    if unit_cell_size is not None :
+        # ratio of diff vol to unit_cell vol
+        over_sampling = float(diff.size) / float(unit_cell_size[0]*unit_cell_size[1]*unit_cell_size[2]) 
+    else :
+        over_sampling = 2.
+
     rav = rad_av(diff_out)
-    N = float(n) / (1. * rav[int(np.min(diff.shape) / 2. - 1.)])
+    N = float(n) / (over_sampling * rav[int(np.min(diff.shape) / 2. - 1.)])
     print 'total number of photons required:', int(N)
+    print 'oversampling :', over_sampling
 
     # Poisson sampling
     diff_out = np.random.poisson(lam = N * diff_out).astype(np.float64)

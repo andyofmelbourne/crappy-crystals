@@ -45,7 +45,8 @@ def generate_diff(config):
     # add noise
     if config['detector']['photons'] is not None :
         diff, edges = add_noise_3d(diff, config['detector']['photons'], \
-                                      remove_courners = config['detector']['cut_courners'])
+                                      remove_courners = config['detector']['cut_courners'],\
+                                      unit_cell_size = config['crystal']['unit_cell'])
     else :
         edges = np.ones_like(diff, dtype=np.bool)
 
