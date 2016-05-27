@@ -46,23 +46,20 @@ To display the ouput:
 $ crappy_crystals.py -d examples/example_duck_P1/config.ini
 ```
 
+### GPU example
+If you have afnumpy: https://github.com/FilipeMaia/afnumpy
+Then you may run this code on the gpu:
+```
+$ cp -r ~/.local/lib/python2.7/site-packages/crappy_crystals/examples .
+$ crappy_crystals.py examples/example_duck_P1/config.ini
+```
 
-### At CFEL?
+#### Getting afnumpy working on the CFEL maxwell machines
 Do:
 ```
-ssh -X it-hpc-cxi01
+ssh -X max-cfelg
 module load python/2.7
 module load opencl/intel
-export PYTHONPATH=/afs/desy.de/user/a/amorgan/python_packages/lib/python2.7/site-packages/:$PYTHONPATH
-./crappy_crystals.py examples/gpu_example_duck_P1/config.ini
-```
-Note that pyqtgraph is not installed so you will 
-need to use sshfs or copy the files to your computer 
-before running:
-```
-python utils/display.py examples/example_duck_P1/output.h5
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/amorgan/.local/lib/
 ```
 
-
-### Based on the paper
-- Awesome Nature paper yet to be published...
