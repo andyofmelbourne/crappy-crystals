@@ -1,8 +1,11 @@
 import numpy as np
 import sys
 
-from utils.disorder      import make_exp
-from utils.l2norm        import l2norm
+import crappy_crystals
+import crappy_crystals.utils.disorder
+import crappy_crystals.utils.l2norm
+from   crappy_crystals.utils.disorder import make_exp
+from   crappy_crystals.utils.l2norm   import l2norm
 
 
 class Mappings():
@@ -21,10 +24,10 @@ class Mappings():
     """
     def __init__(self, params):
         if params['crystal']['space_group'] == 'P1':
-            import symmetry_operations.P1 as sym_ops 
+            import crappy_crystals.symmetry_operations.P1 as sym_ops 
             print '\ncrystal space group: P1'
         elif params['crystal']['space_group'] == 'P212121':
-            import symmetry_operations.P212121 as sym_ops 
+            import crappy_crystals.symmetry_operations.P212121 as sym_ops 
             print '\ncrystal space group: P212121'
         self.sym_ops = sym_ops
 

@@ -14,6 +14,19 @@ optional arguments:
   -h, --help  show this help message and exit
 ```
 
+### Installation as local user on Linux
+```
+$ git clone https://github.com/andyofmelbourne/crappy-crystals.git ~/.local/lib/python2.7/site-packages/crappy_crystals
+$ export PATH=$PATH:~/.local/lib/python2.7/site-packages/crappy_crystals
+```
+
+or (more perminantly) add
+
+```
+export PATH=$HOME/.local/lib/python2.7/site-packages/crappy_crystals:$PATH
+```
+to your ~/.bashrc or ~/.zshrc file.
+
 ### Requires
 - python (probably >= 2.7)
 - h5py 
@@ -24,9 +37,8 @@ optional arguments:
 
 ### Example
 ```
-git clone https://github.com/andyofmelbourne/crappy-crystals.git
-cd crappy-crystals
-./crappy_crystals.py examples/example_duck_P1/config.ini
+$ cp -r ~/.local/lib/python2.7/site-packages/crappy_crystals/examples .
+$ ./crappy_crystals.py examples/example_duck_P1/config.ini
 ```
 
 To display the ouput:

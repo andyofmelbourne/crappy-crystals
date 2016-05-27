@@ -6,6 +6,8 @@ def parse_cmdline_args():
     parser = argparse.ArgumentParser(prog = 'crappy-crystals.py', description='phase a translationally disordered crystal')
     parser.add_argument('config', type=str, \
                         help="file name of the configuration file")
+    parser.add_argument('-d', '--display', action='store_true', \
+                        help="display the contents of the output.h5 file and do not phase")
     args = parser.parse_args()
 
     # check that args.ini exists

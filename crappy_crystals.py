@@ -6,18 +6,11 @@ import ConfigParser
 import numpy as np
 import subprocess
 
-sys.path.append('.')
-from solid_units.duck_3D import make_3D_duck
-from utils.disorder      import make_exp
-from utils.io_utils      import parse_parameters
-from utils.io_utils      import parse_cmdline_args
-from utils.io_utils      import write_input_h5
-from utils.add_noise_3d  import add_noise_3d
-from utils.padding       import expand_region_by
-from utils.beamstop      import make_beamstop
+import solid_units
+import utils
 
 def generate_diff(config):
-    solid_unit = make_3D_duck(shape = config['solid_unit']['shape'])
+    solid_unit = solid_units.duck_3D.make_3D_duck(shape = config['solid_unit']['shape'])
     
     if config['crystal']['space_group'] == 'P1':
         import symmetry_operations.P1 as sym_ops 
@@ -35,7 +28,7 @@ def generate_diff(config):
                                config['detector']['shape'])
     
     N   = config['disorder']['n']
-    exp = make_exp(config['disorder']['sigma'], config['detector']['shape'])
+    exp = utils.disorder.make_exp(config['disorder']['sigma'], config['detector']['shape'])
     
     lattice = sym_ops.lattice(config['crystal']['unit_cell'], config['detector']['shape'])
     
@@ -44,7 +37,7 @@ def generate_diff(config):
 
     # add noise
     if config['detector']['photons'] is not None :
-        diff, edges = add_noise_3d(diff, config['detector']['photons'], \
+        diff, edges = utils.add_noise_3d.add_noise_3d(diff, config['detector']['photons'], \
                                       remove_courners = config['detector']['cut_courners'],\
                                       unit_cell_size = config['crystal']['unit_cell'])
     else :
@@ -52,13 +45,13 @@ def generate_diff(config):
 
     # define the solid_unit support
     if config['solid_unit']['support_frac'] is not None :
-        support = expand_region_by(solid_unit_expanded > 0.1, config['solid_unit']['support_frac'])
+        support = utils.padding.expand_region_by(solid_unit_expanded > 0.1, config['solid_unit']['support_frac'])
     else :
         support = solid_unit_expanded > (solid_unit_expanded.min() + 1.0e-5)
     
     # add a beamstop
     if config['detector']['beamstop'] is not None :
-        beamstop = make_beamstop(diff.shape, config['detector']['beamstop'])
+        beamstop = utils.beamstop.make_beamstop(diff.shape, config['detector']['beamstop'])
         diff    *= beamstop
     else :
         beamstop = np.ones_like(diff, dtype=np.bool)
@@ -67,19 +60,28 @@ def generate_diff(config):
 
 
 if __name__ == "__main__":
-    args = parse_cmdline_args()
+    args = utils.io_utils.parse_cmdline_args()
     
     config = ConfigParser.ConfigParser()
     config.read(args.config)
     
-    params = parse_parameters(config)
+    params = utils.io_utils.parse_parameters(config)
+
+    if args.display :
+        script_dir = os.path.dirname(__file__)
+        display_fnam  = os.path.join(script_dir, 'utils/display.py')
+        runstr = "python " + display_fnam + " " + \
+                         os.path.join(params['output']['path'],'output.h5')
+        print '\n',runstr
+        subprocess.call([runstr], shell=True)
+        sys.exit()
     
     # forward problem
     if params['simulation']['sample'] == 'duck':
         diff, beamstop, edges, support, solid_unit = generate_diff(params)
         
         # write to file
-        write_input_h5(params['output']['path'], diff, support, \
+        utils.io_utils.write_input_h5(params['output']['path'], diff, support, \
                 beamstop + edges, solid_unit, args.config)
 
     # inverse problem

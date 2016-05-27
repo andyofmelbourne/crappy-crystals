@@ -1,4 +1,5 @@
 import numpy as np
+import os
 
 def interp_3d(array, shapeout):
     from scipy.interpolate import griddata
@@ -18,8 +19,11 @@ def interp_3d(array, shapeout):
     
 
 def make_3D_duck(shape = (12, 25, 30)):
+    script_dir = os.path.dirname(__file__)
+    duck_fnam  = os.path.join(script_dir, 'duck_300_211_8bit.raw')
+    
     # call in a low res 2d duck image
-    duck = np.fromfile('solid_units/duck_300_211_8bit.raw', dtype=np.int8).reshape((211, 300))
+    duck = np.fromfile(duck_fnam, dtype=np.int8).reshape((211, 300))
     
     # convert to bool
     duck = duck < 50
