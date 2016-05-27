@@ -38,12 +38,12 @@ to your ~/.bashrc or ~/.zshrc file.
 ### Example
 ```
 $ cp -r ~/.local/lib/python2.7/site-packages/crappy_crystals/examples .
-$ ./crappy_crystals.py examples/example_duck_P1/config.ini
+$ crappy_crystals.py examples/example_duck_P1/config.ini
 ```
 
 To display the ouput:
 ```
-python utils/display.py examples/example_duck_P1/output.h5
+$ crappy_crystals.py -d examples/example_duck_P1/config.ini
 ```
 
 
