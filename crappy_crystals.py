@@ -67,8 +67,20 @@ if __name__ == "__main__":
     
     params = utils.io_utils.parse_parameters(config)
 
+    # display the result
     if args.display :
         script_dir = os.path.dirname(__file__)
+        
+        # input
+        """
+        display_fnam  = os.path.join(script_dir, 'utils/display.py')
+        runstr = "python " + display_fnam + " " + \
+                         os.path.join(params['output']['path'],'input.h5')
+        print '\n',runstr
+        subprocess.call([runstr], shell=True)
+        """
+        
+        # input
         display_fnam  = os.path.join(script_dir, 'utils/display.py')
         runstr = "python " + display_fnam + " " + \
                          os.path.join(params['output']['path'],'output.h5')

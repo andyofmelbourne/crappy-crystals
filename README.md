@@ -20,7 +20,7 @@ $ git clone https://github.com/andyofmelbourne/crappy-crystals.git ~/.local/lib/
 $ export PATH=$PATH:~/.local/lib/python2.7/site-packages/crappy_crystals
 ```
 
-or (more perminantly) add
+or (more permanently) add
 
 ```
 export PATH=$HOME/.local/lib/python2.7/site-packages/crappy_crystals:$PATH
@@ -41,7 +41,7 @@ $ cp -r ~/.local/lib/python2.7/site-packages/crappy_crystals/examples .
 $ crappy_crystals.py examples/example_duck_P1/config.ini
 ```
 
-To display the ouput:
+To display the output:
 ```
 $ crappy_crystals.py -d examples/example_duck_P1/config.ini
 ```
@@ -55,7 +55,6 @@ $ crappy_crystals.py examples/example_duck_P1/config.ini
 ```
 
 #### Getting afnumpy working on the CFEL maxwell machines
-Do:
 ```
 ssh -X max-cfelg
 module load python/2.7
