@@ -34,13 +34,20 @@ class P212121():
         self.translations = np.array([T0, T1, T2, T3])
         
         # keep an array for the 4 symmetry related coppies of the solid unit
-        self.flips = np.zeros((4,) + det_shape, dtype=dtype)
+        self.syms = np.zeros((4,) + det_shape, dtype=dtype)
     
     def solid_syms_Fourier(self, solid):
         # x = x
-        self.flips[0] = solid
+        self.syms[0] = solid
         # x = 0.5 + x, 0.5 - y, -z
-        self.flips[1] = solid[:, ::-1, ::-1]
+        self.syms[1] = solid[:, ::-1, ::-1]
+        # x = -x, 0.5 + y, 0.5 - z
+        self.syms[2] = solid[::-1, ::, ::-1]
+        # x = 0.5 - x, -y, 0.5 + z
+        self.syms[3] = solid[::-1, ::-1, ::]
+
+        self.syms *= self.translations
+        return self.syms
 
 
 def T_fourier(shape, T, is_fft_shifted = True):
