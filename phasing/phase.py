@@ -2,6 +2,7 @@ import numpy as np
 import sys
 import os
 import ConfigParser
+import time
 
 import crappy_crystals
 import crappy_crystals.utils
@@ -12,11 +13,14 @@ from crappy_crystals.phasing.era import ERA
 
 
 def phase(I, solid_support, params, good_pix = None, solid_known = None):
-
+    
+    d0 = time.time()
     solid_ret, info = ERA(I, params['phasing']['era'], solid_support, params, \
-                          mask = good_pix, O = solid_known, \
+                          mask = good_pix, O = None, \
                           background = None, method = 1, hardware = 'cpu', \
                           alpha = 1.0e-10, dtype = 'double', full_output = True)
+    d1 = time.time()
+    print '\n\nTime (s):', d1 - d0
     
     return solid_ret, info['I'], info['eMod'], np.zeros_like(info['eMod'])
 

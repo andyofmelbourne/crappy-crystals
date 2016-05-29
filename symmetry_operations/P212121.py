@@ -3,6 +3,46 @@ from P1 import lattice
 
 name = 'P212121'
 
+class P212121():
+    """
+    Store arrays to make the crystal mapping more
+    efficient.
+
+    Assume that Fourier space arrays are fft shifted.
+
+    Perform symmetry operations with the np.fft.fftfreq basis
+    so that (say) a flip operation behaves like:
+    a         = [0, 1, 2, 3, 4, 5, 6, 7]
+    a flipped = [0, 7, 6, 5, 4, 3, 2, 1]
+
+    or:
+    i         = np.fft.fftfreq(8)*8
+              = [ 0,  1,  2,  3, -4, -3, -2, -1]
+    i flipped = [ 0, -1, -2, -3, -4,  3,  2,  1]
+    """
+    def __init__(self, unitcell_size, det_shape, dtype=np.complex128):
+        # store the tranlation ramps
+        # x = x
+        T0 = np.ones(det_shape, dtype=np.complex128)
+        # x = 0.5 + x, 0.5 - y, -z
+        T1 = T_fourier(det_shape, [unitcell_size[0]/2., unitcell_size[1]/2., 0.0])
+        # x = -x, 0.5 + y, 0.5 - z
+        T2 = T_fourier(det_shape, [0.0, unitcell_size[1]/2., unitcell_size[2]/2.])
+        # x = 0.5 - x, -y, 0.5 + z
+        T3 = T_fourier(det_shape, [unitcell_size[0]/2., 0.0, unitcell_size[2]/2.])
+        
+        self.translations = np.array([T0, T1, T2, T3])
+        
+        # keep an array for the 4 symmetry related coppies of the solid unit
+        self.flips = np.zeros((4,) + det_shape, dtype=dtype)
+    
+    def solid_syms_Fourier(self, solid):
+        # x = x
+        self.flips[0] = solid
+        # x = 0.5 + x, 0.5 - y, -z
+        self.flips[1] = solid[:, ::-1, ::-1]
+
+
 def T_fourier(shape, T, is_fft_shifted = True):
     """
     e - 2pi i r q

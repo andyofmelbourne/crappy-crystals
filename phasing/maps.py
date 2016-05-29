@@ -37,8 +37,9 @@ class Mappings():
         self.N          = params['disorder']['n']
         self.exp        = make_exp(params['disorder']['sigma'], params['detector']['shape'])
         self.lattice    = sym_ops.lattice(params['crystal']['unit_cell'], params['detector']['shape'])
-        self.solid_syms = lambda x : sym_ops.solid_syms(x, params['crystal']['unit_cell'], params['detector']['shape'])
-
+        self.solid_syms = lambda x : sym_ops.solid_syms(x, params['crystal']['unit_cell'], \
+                                                        params['detector']['shape'])
+    
     def modes(self, solid_syms):
         modes = np.zeros((solid_syms.shape[0] + 1,) + solid_syms.shape[1 :], dtype=solid_syms.dtype)
         
@@ -111,96 +112,3 @@ def update_progress(progress, algorithm, i, emod, esup):
     sys.stdout.write(text)
     sys.stdout.flush()
 
-def phase(I, solid_support, params, good_pix = None, solid_known = None):
-    """
-    """
-    if good_pix is None :
-        good_pix = I > -1
-
-    maps = Mappings(params)
-    
-    def Pmod(x):
-        """
-        O --> solid_syms
-        _Pmod
-        modes --> O
-        """
-        solid_syms = maps.solid_syms(x)
-        x = _Pmod(solid_syms[0], I, maps.make_diff(solid_syms = solid_syms), good_pix)
-        x = np.fft.ifftn(x)
-        return x
-
-    def Psup(x):
-        # apply support
-        y = x * solid_support
-        
-        # apply reality
-        y.imag = 0.0
-        
-        # apply positivity
-        y[np.where(y<0)] = 0.0
-        return y
-
-    #Psup = lambda x : (x * solid_support).real + 0.0J
-    
-    ERA = lambda x : Psup(Pmod(x))
-    HIO = lambda x : HIO_(x.copy(), Pmod, Psup, beta=1.)
-    DM  = lambda x : DM_(x, Pmod, Psup, beta=1.0)
-    DM_to_sol = lambda x : DM_to_sol_(x, Pmod, Psup, beta=1.0)
-
-    iters = 500
-    e_mod = []
-    e_sup = []
-    e_fid = []
-
-    print 'alg: progress iteration modulus error fidelty'
-    x = np.random.random(solid_support.shape) + 0.0J
-    x = Psup(x)
-    """
-    for i in range(iters):
-        x = DM(x)
-        x_sol = DM_to_sol(x)
-        
-        # calculate the fidelity and modulus error
-        M = maps.make_diff(solid = x_sol)
-        e_mod.append(l2norm(np.sqrt(I), np.sqrt(M)))
-        #e_sup.append(l2norm(x, Psup(x_sol)))
-        if solid_known is not None :
-            e_fid.append(l2norm(solid_known + 0.0J, x_sol))
-        else :
-            e_fid.append(-1)
-        
-        update_progress(i / max(1.0, float(iters-1)), 'DM', i, e_mod[-1], e_fid[-1])
-    """
-
-    for i in range(iters):
-        x = HIO(x)
-        
-        # calculate the fidelity and modulus error
-        M = maps.make_diff(solid = x)
-        e_mod.append(l2norm(np.sqrt(I), np.sqrt(M)))
-        #e_sup.append(l2norm(x, Psup(x)))
-        if solid_known is not None :
-            e_fid.append(l2norm(solid_known + 0.0J, x))
-        else :
-            e_fid.append(-1)
-        
-        update_progress(i / max(1.0, float(iters-1)), 'HIO', i, e_mod[-1], e_fid[-1])
-
-    iters = 100
-    for i in range(iters):
-        x = ERA(x)
-        
-        # calculate the fidelity and modulus error
-        M = maps.make_diff(solid = x)
-        e_mod.append(l2norm(np.sqrt(I), np.sqrt(M)))
-        e_sup.append(l2norm(x, Psup(x)))
-        if solid_known is not None :
-            e_fid.append(l2norm(solid_known + 0.0J, x))
-        else :
-            e_fid.append(-1)
-        
-        update_progress(i / max(1.0, float(iters-1)), 'ERA', i, e_mod[-1], e_fid[-1])
-    print '\n'
-
-    return x, M
