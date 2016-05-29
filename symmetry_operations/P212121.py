@@ -49,6 +49,46 @@ class P212121():
         self.syms *= self.translations
         return self.syms
 
+def test_P212121():
+    # make a unit cell
+    unit_cell_size = tuple([12,6,4])
+    solid_shape    = tuple([6,3,2])
+    
+    i = np.fft.fftfreq(unit_cell_size[0]).astype(np.int)*unit_cell_size[0]
+    j = np.fft.fftfreq(unit_cell_size[1]).astype(np.int)*unit_cell_size[1]
+    k = np.fft.fftfreq(unit_cell_size[2]).astype(np.int)*unit_cell_size[2]
+    i, j, k = np.meshgrid(i, j, k, indexing='ij')
+    
+    solid = np.random.random(solid_shape)
+    Solid = np.fft.fftn(solid, unit_cell_size)
+    solid = np.fft.ifftn(Solid)
+
+    sym_ops = P212121(unit_cell_size, unit_cell_size)
+    unit_cell = sym_ops.solid_syms_Fourier(solid)
+
+    # test symmetries
+    u2 = np.array(unit_cell_size) / 2
+    print 'r1 = x, y, z:', \
+            np.allclose(unit_cell[i,j,k], unit_cell[i,j,k])
+
+    i2 =  ((i + u2[0] + u2[0]) % unit_cell_size[0]) - u2[0]
+    j2 = ((-j + u2[1] + u2[1]) % unit_cell_size[1]) - u2[1] 
+    k2 = -k
+    print 'r2 = 1/2 + x, 1/2 - y, -z:', \
+            np.allclose(unit_cell[i,j,k], unit_cell[i2,j2,k2])
+
+    i2 =  -i
+    j2 = ((j + u2[1] + u2[1]) % unit_cell_size[1]) - u2[1] 
+    k2 = ((-k + u2[2] + u2[2]) % unit_cell_size[2]) - u2[2] 
+    print 'r2 = -x, 1/2 + y, 1/2 - z:', \
+            np.allclose(unit_cell[i,j,k], unit_cell[i2,j2,k2])
+
+    i2 = ((-k + u2[2] + u2[2]) % unit_cell_size[2]) - u2[2] 
+    j2 = -j
+    k2 = ((k + u2[2] + u2[2]) % unit_cell_size[2]) - u2[2] 
+    print 'r2 = 1/2-x, -y, 1/2 + z:', \
+            np.allclose(unit_cell[i,j,k], unit_cell[i2,j2,k2])
+
 
 def T_fourier(shape, T, is_fft_shifted = True):
     """
