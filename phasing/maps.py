@@ -26,10 +26,13 @@ class Mappings():
         if params['crystal']['space_group'] == 'P1':
             import crappy_crystals.symmetry_operations.P1 as sym_ops 
             print '\ncrystal space group: P1'
+            self.sym_ops_obj = sym_ops.P1(params['crystal']['unit_cell'], params['detector']['shape'])
         elif params['crystal']['space_group'] == 'P212121':
             import crappy_crystals.symmetry_operations.P212121 as sym_ops 
+            self.sym_ops_obj = sym_ops.P212121(params['crystal']['unit_cell'], params['detector']['shape'])
             print '\ncrystal space group: P212121'
-        self.sym_ops = sym_ops
+        
+        self.sym_ops = self.sym_ops_obj.solid_syms_Fourier
 
         # in general we have the inchorent mapping
         # and the inchoherent one (unit cell)
@@ -37,8 +40,7 @@ class Mappings():
         self.N          = params['disorder']['n']
         self.exp        = make_exp(params['disorder']['sigma'], params['detector']['shape'])
         self.lattice    = sym_ops.lattice(params['crystal']['unit_cell'], params['detector']['shape'])
-        self.solid_syms = lambda x : sym_ops.solid_syms(x, params['crystal']['unit_cell'], \
-                                                        params['detector']['shape'])
+        self.solid_syms = lambda x : sym_ops.solid_syms(x)
     
     def modes(self, solid_syms):
         modes = np.zeros((solid_syms.shape[0] + 1,) + solid_syms.shape[1 :], dtype=solid_syms.dtype)
@@ -52,45 +54,12 @@ class Mappings():
 
     def make_diff(self, solid = None, solid_syms = None):
         if solid_syms is None :
-            solid_syms = self.solid_syms(solid)
-
+            solid_syms = self.sym_ops(solid)
+        
         modes = self.modes(solid_syms)
-
+        
         diff = np.sum(np.abs(modes)**2, axis=0)
         return diff
-
-def HIO_(exit, Pmod, Psup, beta=1.):
-    out = Pmod(exit)
-    out = exit + beta * Psup( (1+1/beta)*out - 1/beta * exit ) - beta * out  
-    return out
-
-def DM_(psi, Pmod, Psup, beta=0.7):
-    """
-    psi_j+1 = psi_j - Ps psi_j - Pm psi_j
-            + b(1+1/b) Ps Pm psi_j
-            - b(1-1/b) Pm Ps psi_j
-    """
-    psi_M = psi.copy()
-    psi_M = Pmod(psi_M)
-    psi_S = Psup(psi)
-    psi  -= psi_M + psi_S
-    psi  += Psup(beta * (1. + 1. / beta) * psi_M)
-    psi_S = Pmod(psi_S)
-    psi  -= beta * (1. - 1. / beta) * psi_S
-    return psi
-
-def DM_to_sol_(psi, Pmod, Psup, beta):
-    psi_M = psi.copy()
-    psi_M = Pmod(psi_M)
-    psi_M = (1. + 1./beta) * psi_M - 1./beta * psi
-    psi_M = Psup(psi_M)
-    return psi_M
-
-def Pmod_(modes, diff, M, good_pix, alpha = 1.0e-10):
-    
-    modes = modes * (~good_pix + good_pix * np.sqrt(diff) / (np.sqrt(M) + alpha))
-    
-    return modes
 
 
 def update_progress(progress, algorithm, i, emod, esup):

@@ -58,7 +58,13 @@ def ERA(I, iters, support, params, mask = 1, O = None, background = None, method
         c_dtype = np.complex128
 
     if O is None :
-        O = np.random.random((I.shape)).astype(c_dtype)
+        O  = np.random.random((I.shape)).astype(c_dtype)
+        # support proj
+        if type(support) is int :
+            S = choose_N_highest_pixels( (O * O.conj()).real, support)
+        else :
+            S = support
+        O = O * S
     
     O    = O.astype(c_dtype)
     
@@ -79,9 +85,9 @@ def ERA(I, iters, support, params, mask = 1, O = None, background = None, method
     Imap   = lambda x : mapper.make_diff(solid = x)
     
     # initial error
-    print '\nInitial error: ', l2norm(mask*Imap(np.fft.fftn(O)), mask*I)
-
-
+    print '\nHello'
+    print '\nInitial error: ', l2norm(np.sqrt(mask*I), np.sqrt(mask*Imap(np.fft.fftn(O))))
+    
     # method 1
     #---------
     if method == 1 :
@@ -111,13 +117,15 @@ def ERA(I, iters, support, params, mask = 1, O = None, background = None, method
             # metrics
             O2 = O.copy()
             
-            O2    -= O0
-            eCon   = np.sum( (O2 * O2.conj()).real ) / np.sum( (O0 * O0.conj()).real )
-            eCon   = np.sqrt(eCon)
+            #O2    -= O0
+            #eCon   = np.sum( (O2 * O2.conj()).real ) / np.sum( (O0 * O0.conj()).real )
+            #eCon   = np.sqrt(eCon)
+            eCon   = l2norm(O2, O0)
             
-            O1    -= O0
-            eMod   = np.sum( (O1 * O1.conj()).real ) / I_norm
-            eMod   = np.sqrt(eMod)
+            #O1    -= O0
+            #eMod   = np.sum( (O1 * O1.conj()).real ) / I_norm
+            #eMod   = np.sqrt(eMod)
+            eMod   = l2norm(O1, O0)
             
             update_progress(i / max(1.0, float(iters-1)), 'ERA', i, eCon, eMod )
             

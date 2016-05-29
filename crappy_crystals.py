@@ -13,16 +13,16 @@ def generate_diff(config):
     solid_unit = solid_units.duck_3D.make_3D_duck(shape = config['solid_unit']['shape'])
     
     if config['crystal']['space_group'] == 'P1':
-        import symmetry_operations.P1 as sym_ops 
+        import symmetry_operations.P1 as sym_ops
+        sym_ops_obj = sym_ops.P1(params['crystal']['unit_cell'], params['detector']['shape'])
     elif config['crystal']['space_group'] == 'P212121':
-        import symmetry_operations.P212121 as sym_ops 
+        import symmetry_operations.P212121 as sym_ops
+        sym_ops_obj = sym_ops.P212121(params['crystal']['unit_cell'], params['detector']['shape'])
     
     Solid_unit = np.fft.fftn(solid_unit, config['detector']['shape'])
     solid_unit_expanded = np.fft.ifftn(Solid_unit)
 
-    modes = sym_ops.solid_syms(Solid_unit, \
-                               config['crystal']['unit_cell'], \
-                               config['detector']['shape'])
+    modes = sym_ops_obj.solid_syms_Fourier(Solid_unit)
     
     N   = config['disorder']['n']
     exp = utils.disorder.make_exp(config['disorder']['sigma'], config['detector']['shape'])

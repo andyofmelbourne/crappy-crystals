@@ -34,7 +34,7 @@ class P212121():
         self.translations = np.array([T0, T1, T2, T3])
         
         # keep an array for the 4 symmetry related coppies of the solid unit
-        self.syms = np.zeros((4,) + det_shape, dtype=dtype)
+        self.syms = np.zeros((4,) + tuple(det_shape), dtype=dtype)
     
     def solid_syms_Fourier(self, solid):
         # x = x
