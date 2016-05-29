@@ -10,7 +10,7 @@ def solid_syms(solid_unit, unitcell_size, det_shape):
     """
     #unitcell = unit_cell(solid_unit, unitcell_size)
     #unitcell = np.fft.fftn(unitcell, det_shape)
-    unitcell = np.fft.fftn(solid_unit, det_shape)
+    unitcell = solid_unit #np.fft.fftn(solid_unit, det_shape)
     return unitcell[np.newaxis, :, :, :]
 
 def unit_cell(solid_unit, unitcell_size):

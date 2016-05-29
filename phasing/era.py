@@ -79,7 +79,7 @@ def ERA(I, iters, support, params, mask = 1, O = None, background = None, method
     Imap   = lambda x : mapper.make_diff(solid = x)
     
     # initial error
-    print '\nInitial error: ', l2norm(mask*Imap(O), mask*I)
+    print '\nInitial error: ', l2norm(mask*Imap(np.fft.fftn(O)), mask*I)
 
 
     # method 1
@@ -92,9 +92,9 @@ def ERA(I, iters, support, params, mask = 1, O = None, background = None, method
             
             # modulus projection 
             if background is not None :
-                O, background  = pmod_back(amp, background, O, Imap(O), mask, alpha = alpha)
+                O, background  = pmod_back(amp, background, O, Imap, mask, alpha = alpha)
             else :
-                O = pmod(amp, O, Imap(O), mask, alpha = alpha)
+                O = pmod(amp, O, Imap, mask, alpha = alpha)
             
             O1 = O.copy()
             
@@ -177,7 +177,7 @@ def radial_symetry(background, rs = None, is_fft_shifted = True):
 
 def pmod(amp, O, Imap, mask = 1, alpha = 1.0e-10):
     O = np.fft.fftn(O)
-    O = Pmod(amp, O, Imap, mask = mask, alpha = alpha)
+    O = Pmod(amp, O, Imap(O), mask = mask, alpha = alpha)
     O = np.fft.ifftn(O)
     return O
     
@@ -189,7 +189,7 @@ def Pmod(amp, O, Imap, mask = 1, alpha = 1.0e-10):
 
 def pmod_back(amp, background, O, Imap, mask = 1, alpha = 1.0e-10):
     O = np.fft.fftn(O)
-    O, background = Pmod_back(amp, background, O, Imap, mask = mask, alpha = alpha)
+    O, background = Pmod_back(amp, background, O, Imap(O), mask = mask, alpha = alpha)
     O = np.fft.ifftn(O)
     return O, background
     

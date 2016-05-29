@@ -71,8 +71,8 @@ def solid_syms(solid_unit, unitcell_size, det_shape):
     of the symmetry related partners.
     """
     modes = []
-    unitcell = np.fft.fftn(solid_unit, det_shape)
-    modes.append(unitcell)
+    unitcell = solid_unit #np.fft.fftn(solid_unit, det_shape)
+    modes.append(unitcell.copy())
     
     # x = 0.5 + x, 0.5 - y, -z
     temp  = unitcell[::, ::-1, ::-1].copy()

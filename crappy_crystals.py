@@ -23,7 +23,7 @@ def generate_diff(config):
     Solid_unit = np.fft.fftn(solid_unit, config['detector']['shape'])
     solid_unit_expanded = np.fft.ifftn(Solid_unit)
 
-    modes = sym_ops.solid_syms(solid_unit_expanded, \
+    modes = sym_ops.solid_syms(Solid_unit, \
                                config['crystal']['unit_cell'], \
                                config['detector']['shape'])
     
