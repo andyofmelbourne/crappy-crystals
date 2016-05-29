@@ -30,28 +30,16 @@ class P1():
         self.syms = np.zeros((1,) + tuple(det_shape), dtype=dtype)
     
     def solid_syms_Fourier(self, solid):
+        """
+        Take the Fourier space solid unit then return each
+        of the symmetry related partners.
+        """
         # x = x
         self.syms[0] = solid
         
         self.syms *= self.translations
         return self.syms
 
-
-def solid_syms(solid_unit, unitcell_size, det_shape):
-    """
-    Take the solid unit and map it 
-    to the detector. Then return each
-    of the symmetry related partners.
-    """
-    #unitcell = unit_cell(solid_unit, unitcell_size)
-    #unitcell = np.fft.fftn(unitcell, det_shape)
-    unitcell = solid_unit #np.fft.fftn(solid_unit, det_shape)
-    return unitcell[np.newaxis, :, :, :]
-
-def unit_cell(solid_unit, unitcell_size):
-    array = np.zeros(unitcell_size, dtype=np.float) 
-    array[: solid_unit.shape[0], : solid_unit.shape[1], : solid_unit.shape[2]] = solid_unit
-    return array
 
 def lattice(unit_cell_size, shape):
     """

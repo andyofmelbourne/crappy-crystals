@@ -85,7 +85,6 @@ def ERA(I, iters, support, params, mask = 1, O = None, background = None, method
     Imap   = lambda x : mapper.make_diff(solid = x)
     
     # initial error
-    print '\nHello'
     print '\nInitial error: ', l2norm(np.sqrt(mask*I), np.sqrt(mask*Imap(np.fft.fftn(O))))
     
     # method 1
