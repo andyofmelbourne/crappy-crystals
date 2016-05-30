@@ -72,8 +72,6 @@ def test_P212121():
     i, j, k = np.meshgrid(i, j, k, indexing='ij')
     
     solid = np.random.random(solid_shape)
-    #solid = np.zeros(solid_shape)
-    #solid[1,2,1] = 1.
     Solid = np.fft.fftn(solid, unit_cell_size)
     solid = np.fft.ifftn(Solid)
 
@@ -82,8 +80,16 @@ def test_P212121():
     unit_cell = np.sum(unit_cell, axis=0)
     unit_cell = np.fft.ifftn(unit_cell)
     """
+    # manual test :
+    unit_cell_size = tuple([8,8,4])
+    solid_shape    = tuple([4,4,2])
+    
+    solid = np.zeros(solid_shape)
+    solid[1,2,1] = 1.
+
+    # should become
     unit_cell = np.zeros_like(solid)
-    unit_cell[1,2,1] = 1.
+    unit_cell[1,2,1]   = 1.
     unit_cell[-3,2,-1] = 1.
     unit_cell[-1,-2,1] = 1.
     unit_cell[3,-2,-1] = 1.
@@ -206,7 +212,7 @@ if __name__ == '__main__':
     unit_cell = np.fft.ifftn(unit_cell)
     """
     unit_cell = np.zeros_like(solid)
-    unit_cell[1,2,1] = 1.
+    unit_cell[1,2,1]   = 1.
     unit_cell[-3,2,-1] = 1.
     unit_cell[-1,-2,1] = 1.
     unit_cell[3,-2,-1] = 1.
