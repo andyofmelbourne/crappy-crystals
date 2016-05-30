@@ -14,10 +14,10 @@ def generate_diff(config):
     
     if config['crystal']['space_group'] == 'P1':
         import symmetry_operations.P1 as sym_ops
-        sym_ops_obj = sym_ops.P1(params['crystal']['unit_cell'], params['detector']['shape'])
+        sym_ops_obj = sym_ops.P1(config['crystal']['unit_cell'], config['detector']['shape'])
     elif config['crystal']['space_group'] == 'P212121':
         import symmetry_operations.P212121 as sym_ops
-        sym_ops_obj = sym_ops.P212121(params['crystal']['unit_cell'], params['detector']['shape'])
+        sym_ops_obj = sym_ops.P212121(config['crystal']['unit_cell'], config['detector']['shape'])
     
     Solid_unit = np.fft.fftn(solid_unit, config['detector']['shape'])
     solid_unit_expanded = np.fft.ifftn(Solid_unit)
