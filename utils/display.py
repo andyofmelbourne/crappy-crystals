@@ -158,7 +158,7 @@ def make_crystal(fnam):
 
 def show_crystal(fnam):
     c   = make_crystal(fnam)
-    iso = Iso_surface(c.real, c.real.max()*0.9)
+    iso = Iso_surface(c.real[::2,::2,::2], c.real.max()*0.9)
 
 
 class Iso_surface():
@@ -175,13 +175,13 @@ class Iso_surface():
         w.setCameraPosition(distance=40)
 
         g = gl.GLGridItem()
-        g.scale(2,2,1)
+        g.scale(2,2,2)
         w.addItem(g)
 
         import numpy as np
         
         print("Generating isosurface..")
-        verts, faces = pg.isosurface(data, lvl)
+        verts, faces = pg.isosurface(data, data.max()/4.)
 
         md = gl.MeshData(vertexes=verts, faces=faces)
 
