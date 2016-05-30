@@ -6,7 +6,7 @@ import numpy as np
 import signal
 import sys
 
-from io_utils import read_output_h5
+from io_utils import read_input_output_h5
 
 def show_vol(map_3d):
     signal.signal(signal.SIGINT, signal.SIG_DFL)    # allow Control-C
@@ -53,7 +53,7 @@ class Show_vol(QtGui.QWidget):
         self.resize(800,800)
         self.show()
 
-def iso_surface_test()
+def iso_surface_test():
     from pyqtgraph.Qt import QtCore, QtGui
     import pyqtgraph as pg
     import pyqtgraph.opengl as gl
@@ -115,11 +115,54 @@ def iso_surface_test()
 
 def show_crystal(fnam):
     # read the h5 file 
-    diff, diff_ret, support, support_ret, \
-    good_pix, solid_unit, solid_unit_ret, \
-    emod, efid                             = read_output_h5(args.path)
+    kwargs = read_input_output_h5(args.apth)
+    if 'solid_unit_retrieved' in kwargs.keys():
+        params = kwargs['s']
 
-    # 
+    # generate brag Fourier components
+    solid_unit = solid_units.duck_3D.make_3D_duck(shape = config['solid_unit']['shape'])
+    
+    if config['crystal']['space_group'] == 'P1':
+        import symmetry_operations.P1 as sym_ops
+        sym_ops_obj = sym_ops.P1(params['crystal']['unit_cell'], params['detector']['shape'])
+    elif config['crystal']['space_group'] == 'P212121':
+        import symmetry_operations.P212121 as sym_ops
+        sym_ops_obj = sym_ops.P212121(params['crystal']['unit_cell'], params['detector']['shape'])
+    
+    Solid_unit = np.fft.fftn(solid_unit, config['detector']['shape'])
+    solid_unit_expanded = np.fft.ifftn(Solid_unit)
+
+    modes = sym_ops_obj.solid_syms_Fourier(Solid_unit)
+    
+    N   = config['disorder']['n']
+    exp = utils.disorder.make_exp(config['disorder']['sigma'], config['detector']['shape'])
+    
+    lattice = sym_ops.lattice(config['crystal']['unit_cell'], config['detector']['shape'])
+    
+    diff  = N * exp * np.abs(lattice * np.sum(modes, axis=0)**2)
+    diff += (1. - exp) * np.sum(np.abs(modes)**2, axis=0)
+
+    # add noise
+    if config['detector']['photons'] is not None :
+        diff, edges = utils.add_noise_3d.add_noise_3d(diff, config['detector']['photons'], \
+                                      remove_courners = config['detector']['cut_courners'],\
+                                      unit_cell_size = config['crystal']['unit_cell'])
+    else :
+        edges = np.ones_like(diff, dtype=np.bool)
+
+    # define the solid_unit support
+    if config['solid_unit']['support_frac'] is not None :
+        support = utils.padding.expand_region_by(solid_unit_expanded > 0.1, config['solid_unit']['support_frac'])
+    else :
+        support = solid_unit_expanded > (solid_unit_expanded.min() + 1.0e-5)
+    
+    # add a beamstop
+    if config['detector']['beamstop'] is not None :
+        beamstop = utils.beamstop.make_beamstop(diff.shape, config['detector']['beamstop'])
+        diff    *= beamstop
+    else :
+        beamstop = np.ones_like(diff, dtype=np.bool)
+
 
 
 class Iso_surface():
@@ -128,9 +171,7 @@ class Iso_surface():
 
 class Application():
 
-    def __init__(self, diff, diff_ret, support, support_ret, \
-                 good_pix, solid_unit, solid_unit_ret,       \
-                 emod, efid):
+    def __init__(self, **kwargs):
         
         if 'solid_unit_retrieved' in kwargs.keys():
             solid_unit_ret = kwargs['solid_unit_retrieved']
@@ -207,7 +248,7 @@ class Application():
         w.show()
 
         ## Start the Qt event loop
-        app.exec_()
+        sys.exit(app.exec_())
         
         
 def parse_cmdline_args():
@@ -229,14 +270,9 @@ if __name__ == '__main__':
     args = parse_cmdline_args()
     
     # read the h5 file 
-    #diff, diff_ret, support, support_ret, \
-    #good_pix, solid_unit, solid_unit_ret, \
-    #emod, efid                             = read_output_h5(args.path)
-    
-    kwargs = read_input_output_h5(args.apth)
+    kwargs = read_input_output_h5(args.path)
     
     signal.signal(signal.SIGINT, signal.SIG_DFL)    # allow Control-C
     app = QtGui.QApplication(sys.argv)
     
-    ex  = Application(kwargs)
-    sys.exit(app.exec_())
+    ex  = Application(**kwargs)
