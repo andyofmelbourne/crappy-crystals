@@ -40,36 +40,62 @@ class P212121():
         # x = x
         self.syms[0] = solid
         # x = 0.5 + x, 0.5 - y, -z
-        self.syms[1] = solid[:, ::-1, ::-1]
+        self.syms[1][:, 0, :]   = solid[:, 0, :]
+        #self.syms[1][:, :, 0]   = solid[:, :, 0]
+        #self.syms[1][:, 1:, 1:] = solid[:, -1:0:-1, -1:0:-1]
+        self.syms[1][:, 1:, :] =     solid[:, -1:0:-1, :]
+        self.syms[1][:, :, 1:] = self.syms[1][:, :, -1:0:-1]
         # x = -x, 0.5 + y, 0.5 - z
-        self.syms[2] = solid[::-1, ::, ::-1]
+        self.syms[2][0, :, :]   = solid[0, :, :]
+        #self.syms[2][:, :, 0]   = solid[:, :, 0]
+        #self.syms[2][1:, :, 1:] = solid[-1:0:-1, :, -1:0:-1]
+        self.syms[2][1:, :, :] = solid[-1:0:-1, :, :]
+        self.syms[2][:, :, 1:] = self.syms[2][:, :, -1:0:-1]
         # x = 0.5 - x, -y, 0.5 + z
-        self.syms[3] = solid[::-1, ::-1, ::]
+        self.syms[3][0, :, :]   = solid[0, :, :]
+        #self.syms[3][:, 0, :]   = solid[:, 0, :]
+        #self.syms[3][1:, 1:, :] = solid[-1:0:-1, -1:0:-1, :]
+        self.syms[3][1:, :, :] = solid[-1:0:-1, :, :]
+        self.syms[3][:, 1:, :] = self.syms[3][:, -1:0:-1, :]
 
         self.syms *= self.translations
         return self.syms
 
 def test_P212121():
     # make a unit cell
-    unit_cell_size = tuple([12,6,4])
-    solid_shape    = tuple([6,3,2])
+    unit_cell_size = tuple([8,8,4])
+    solid_shape    = tuple([4,4,2])
     
-    i = np.fft.fftfreq(unit_cell_size[0]).astype(np.int)*unit_cell_size[0]
-    j = np.fft.fftfreq(unit_cell_size[1]).astype(np.int)*unit_cell_size[1]
-    k = np.fft.fftfreq(unit_cell_size[2]).astype(np.int)*unit_cell_size[2]
+    i = np.fft.fftfreq(unit_cell_size[0],1./float(unit_cell_size[0])).astype(np.int)
+    j = np.fft.fftfreq(unit_cell_size[1],1./float(unit_cell_size[1])).astype(np.int)
+    k = np.fft.fftfreq(unit_cell_size[2],1./float(unit_cell_size[2])).astype(np.int)
     i, j, k = np.meshgrid(i, j, k, indexing='ij')
     
     solid = np.random.random(solid_shape)
+    #solid = np.zeros(solid_shape)
+    #solid[1,2,1] = 1.
     Solid = np.fft.fftn(solid, unit_cell_size)
     solid = np.fft.ifftn(Solid)
 
-    sym_ops = P212121(unit_cell_size, unit_cell_size)
-    unit_cell = sym_ops.solid_syms_Fourier(solid)
+    sym_ops   = P212121(unit_cell_size, unit_cell_size)
+    unit_cell = sym_ops.solid_syms_Fourier(Solid)
+    unit_cell = np.sum(unit_cell, axis=0)
+    unit_cell = np.fft.ifftn(unit_cell)
+    """
+    unit_cell = np.zeros_like(solid)
+    unit_cell[1,2,1] = 1.
+    unit_cell[-3,2,-1] = 1.
+    unit_cell[-1,-2,1] = 1.
+    unit_cell[3,-2,-1] = 1.
+    """
 
     # test symmetries
     u2 = np.array(unit_cell_size) / 2
-    print 'r1 = x, y, z:', \
-            np.allclose(unit_cell[i,j,k], unit_cell[i,j,k])
+    i1 = i
+    j1 = j
+    k1 = k
+    print 'r1 = x, y, z             :', \
+            np.allclose(unit_cell[i,j,k], unit_cell[i1,j1,k1])
 
     i2 =  ((i + u2[0] + u2[0]) % unit_cell_size[0]) - u2[0]
     j2 = ((-j + u2[1] + u2[1]) % unit_cell_size[1]) - u2[1] 
@@ -77,18 +103,17 @@ def test_P212121():
     print 'r2 = 1/2 + x, 1/2 - y, -z:', \
             np.allclose(unit_cell[i,j,k], unit_cell[i2,j2,k2])
 
-    i2 =  -i
-    j2 = ((j + u2[1] + u2[1]) % unit_cell_size[1]) - u2[1] 
-    k2 = ((-k + u2[2] + u2[2]) % unit_cell_size[2]) - u2[2] 
-    print 'r2 = -x, 1/2 + y, 1/2 - z:', \
-            np.allclose(unit_cell[i,j,k], unit_cell[i2,j2,k2])
+    i3 =  -i
+    j3 = ((j + u2[1] + u2[1]) % unit_cell_size[1]) - u2[1] 
+    k3 = ((-k + u2[2] + u2[2]) % unit_cell_size[2]) - u2[2] 
+    print 'r3 = -x, 1/2 + y, 1/2 - z:', \
+            np.allclose(unit_cell[i,j,k], unit_cell[i3,j3,k3])
 
-    i2 = ((-k + u2[2] + u2[2]) % unit_cell_size[2]) - u2[2] 
-    j2 = -j
-    k2 = ((k + u2[2] + u2[2]) % unit_cell_size[2]) - u2[2] 
-    print 'r2 = 1/2-x, -y, 1/2 + z:', \
-            np.allclose(unit_cell[i,j,k], unit_cell[i2,j2,k2])
-
+    i4 = ((-i + u2[0] + u2[0]) % unit_cell_size[0]) - u2[0] 
+    j4 = -j
+    k4 = ((k + u2[2] + u2[2]) % unit_cell_size[2]) - u2[2] 
+    print 'r3 = 1/2 - x, -y, 1/2 + z:', \
+            np.allclose(unit_cell[i,j,k], unit_cell[i4,j4,k4])
 
 def T_fourier(shape, T, is_fft_shifted = True):
     """
@@ -158,3 +183,57 @@ def unit_cell(solid_unit, unitcell_size):
     array = np.fft.ifftn(np.sum(array, axis=0))
     return array
 
+
+if __name__ == '__main__':
+    # make a unit cell
+    unit_cell_size = tuple([8,8,4])
+    solid_shape    = tuple([4,4,2])
+    
+    i = np.fft.fftfreq(unit_cell_size[0],1./float(unit_cell_size[0])).astype(np.int)
+    j = np.fft.fftfreq(unit_cell_size[1],1./float(unit_cell_size[1])).astype(np.int)
+    k = np.fft.fftfreq(unit_cell_size[2],1./float(unit_cell_size[2])).astype(np.int)
+    i, j, k = np.meshgrid(i, j, k, indexing='ij')
+    
+    solid = np.random.random(solid_shape)
+    #solid = np.zeros(solid_shape)
+    #solid[1,2,1] = 1.
+    Solid = np.fft.fftn(solid, unit_cell_size)
+    solid = np.fft.ifftn(Solid)
+
+    sym_ops   = P212121(unit_cell_size, unit_cell_size)
+    unit_cell = sym_ops.solid_syms_Fourier(Solid)
+    unit_cell = np.sum(unit_cell, axis=0)
+    unit_cell = np.fft.ifftn(unit_cell)
+    """
+    unit_cell = np.zeros_like(solid)
+    unit_cell[1,2,1] = 1.
+    unit_cell[-3,2,-1] = 1.
+    unit_cell[-1,-2,1] = 1.
+    unit_cell[3,-2,-1] = 1.
+    """
+
+    # test symmetries
+    u2 = np.array(unit_cell_size) / 2
+    i1 = i
+    j1 = j
+    k1 = k
+    print 'r1 = x, y, z             :', \
+            np.allclose(unit_cell[i,j,k], unit_cell[i1,j1,k1])
+
+    i2 =  ((i + u2[0] + u2[0]) % unit_cell_size[0]) - u2[0]
+    j2 = ((-j + u2[1] + u2[1]) % unit_cell_size[1]) - u2[1] 
+    k2 = -k
+    print 'r2 = 1/2 + x, 1/2 - y, -z:', \
+            np.allclose(unit_cell[i,j,k], unit_cell[i2,j2,k2])
+
+    i3 =  -i
+    j3 = ((j + u2[1] + u2[1]) % unit_cell_size[1]) - u2[1] 
+    k3 = ((-k + u2[2] + u2[2]) % unit_cell_size[2]) - u2[2] 
+    print 'r3 = -x, 1/2 + y, 1/2 - z:', \
+            np.allclose(unit_cell[i,j,k], unit_cell[i3,j3,k3])
+
+    i4 = ((-i + u2[0] + u2[0]) % unit_cell_size[0]) - u2[0] 
+    j4 = -j
+    k4 = ((k + u2[2] + u2[2]) % unit_cell_size[2]) - u2[2] 
+    print 'r3 = 1/2 - x, -y, 1/2 + z:', \
+            np.allclose(unit_cell[i,j,k], unit_cell[i4,j4,k4])
