@@ -53,6 +53,78 @@ class Show_vol(QtGui.QWidget):
         self.resize(800,800)
         self.show()
 
+def iso_surface_test()
+    from pyqtgraph.Qt import QtCore, QtGui
+    import pyqtgraph as pg
+    import pyqtgraph.opengl as gl
+
+    app = QtGui.QApplication([])
+    w = gl.GLViewWidget()
+    w.show()
+    w.setWindowTitle('pyqtgraph example: GLIsosurface')
+
+    w.setCameraPosition(distance=40)
+
+    g = gl.GLGridItem()
+    g.scale(2,2,1)
+    w.addItem(g)
+
+    import numpy as np
+
+    ## Define a scalar field from which we will generate an isosurface
+    def psi(i, j, k, offset=(25, 25, 50)):
+        x = i-offset[0]
+        y = j-offset[1]
+        z = k-offset[2]
+        th = np.arctan2(z, (x**2+y**2)**0.5)
+        phi = np.arctan2(y, x)
+        r = (x**2 + y**2 + z **2)**0.5
+        a0 = 1
+        #ps = (1./81.) * (2./np.pi)**0.5 * (1./a0)**(3/2) * (6 - r/a0) * (r/a0) * np.exp(-r/(3*a0)) * np.cos(th)
+        ps = (1./81.) * 1./(6.*np.pi)**0.5 * (1./a0)**(3/2) * (r/a0)**2 * np.exp(-r/(3*a0)) * (3 * np.cos(th)**2 - 1)
+        
+        return ps
+        
+        #return ((1./81.) * (1./np.pi)**0.5 * (1./a0)**(3/2) * (r/a0)**2 * (r/a0) * np.exp(-r/(3*a0)) * np.sin(th) * np.cos(th) * np.exp(2 * 1j * phi))**2 
+    
+    
+    print("Generating scalar field..")
+    data = np.abs(np.fromfunction(psi, (50,50,100)))
+    
+    print("Generating isosurface..")
+    verts, faces = pg.isosurface(data, data.max()/4.)
+
+    md = gl.MeshData(vertexes=verts, faces=faces)
+
+    colors = np.ones((md.faceCount(), 4), dtype=float)
+    colors[:,3] = 0.2
+    colors[:,2] = np.linspace(0, 1, colors.shape[0])
+    md.setFaceColors(colors)
+    m1 = gl.GLMeshItem(meshdata=md, smooth=False, shader='balloon')
+    m1.setGLOptions('additive')
+
+    #w.addItem(m1)
+    m1.translate(-25, -25, -20)
+
+    m2 = gl.GLMeshItem(meshdata=md, smooth=True, shader='balloon')
+    m2.setGLOptions('additive')
+
+    w.addItem(m2)
+    m2.translate(-25, -25, -50)
+    app.exec_()
+
+def show_crystal(fnam):
+    # read the h5 file 
+    diff, diff_ret, support, support_ret, \
+    good_pix, solid_unit, solid_unit_ret, \
+    emod, efid                             = read_output_h5(args.path)
+
+    # 
+
+
+class Iso_surface():
+    def __init__(self):
+        pass
 
 class Application():
 
@@ -60,13 +132,24 @@ class Application():
                  good_pix, solid_unit, solid_unit_ret,       \
                  emod, efid):
         
+        if 'solid_unit_retrieved' in kwargs.keys():
+            solid_unit_ret = kwargs['solid_unit_retrieved']
+        elif 'solid_unit_init' in kwargs.keys():
+            solid_unit_ret = kwargs['solid_unit_init']
+        elif 'solid_unit' in kwargs.keys():
+            solid_unit_ret = kwargs['solid_unit']
+        
         solid_unit_ret = np.fft.ifftshift(solid_unit_ret.real)
         duck_plots = (np.sum(solid_unit_ret, axis=0),\
                       np.sum(solid_unit_ret, axis=1),\
                       np.sum(solid_unit_ret, axis=2))
-
+        
         duck_plots = np.hstack(duck_plots)
         
+        if 'data_retrieved' in kwargs.keys():
+            diff = kwargs['data_retrieved']
+        elif 'data' in kwargs.keys():
+            diff = kwargs['data']
         diff_plots = np.hstack((np.fft.ifftshift(diff[0, :, :]), \
                                 np.fft.ifftshift(diff[:, 0, :]), \
                                 np.fft.ifftshift(diff[:, :, 0])))
@@ -109,10 +192,16 @@ class Application():
 
         self.duck_plots.setImage(duck_plots.T)
         self.diff_plots.setImage(diff_plots.T)
-        self.plot_emod.plot(emod)
-        self.plot_emod.setTitle('Modulus error l2norm:')
-        self.plot_efid.plot(efid)
-        self.plot_efid.setTitle('Fidelity error l2norm:')
+
+        if 'modulus_error' in kwargs.keys():
+            emod = kwargs['modulus_error']
+            self.plot_emod.plot(emod)
+            self.plot_emod.setTitle('Modulus error l2norm:')
+        
+        if 'fidelity_error' in kwargs.keys():
+            efid = kwargs['fidelity_error']
+            self.plot_efid.plot(efid)
+            self.plot_efid.setTitle('Fidelity error l2norm:')
         
         ## Display the widget as a new window
         w.show()
@@ -140,13 +229,14 @@ if __name__ == '__main__':
     args = parse_cmdline_args()
     
     # read the h5 file 
-    diff, diff_ret, support, support_ret, \
-    good_pix, solid_unit, solid_unit_ret, \
-    emod, efid                             = read_output_h5(args.path)
+    #diff, diff_ret, support, support_ret, \
+    #good_pix, solid_unit, solid_unit_ret, \
+    #emod, efid                             = read_output_h5(args.path)
+    
+    kwargs = read_input_output_h5(args.apth)
     
     signal.signal(signal.SIGINT, signal.SIG_DFL)    # allow Control-C
     app = QtGui.QApplication(sys.argv)
-    ex  = Application(diff, diff_ret, support, support_ret, \
-                      good_pix, solid_unit, solid_unit_ret, \
-                      emod, efid)
+    
+    ex  = Application(kwargs)
     sys.exit(app.exec_())

@@ -69,15 +69,13 @@ if __name__ == "__main__":
         script_dir = os.path.dirname(__file__)
         
         # input
-        """
         display_fnam  = os.path.join(script_dir, 'utils/display.py')
         runstr = "python " + display_fnam + " " + \
                          os.path.join(params['output']['path'],'input.h5')
         print '\n',runstr
         subprocess.call([runstr], shell=True)
-        """
         
-        # input
+        # output
         display_fnam  = os.path.join(script_dir, 'utils/display.py')
         runstr = "python " + display_fnam + " " + \
                          os.path.join(params['output']['path'],'output.h5')
@@ -90,8 +88,9 @@ if __name__ == "__main__":
         diff, beamstop, edges, support, solid_unit = generate_diff(params)
         
         # write to file
-        utils.io_utils.write_input_h5(params['output']['path'], diff, support, \
-                beamstop + edges, solid_unit, args.config)
+        fnam = os.path.join(params['output']['path'], 'input.h5')
+        utils.io_utils.write_input_output_h5(fnam, data = diff, sample_support = support, \
+                good_pix = beamstop + edges, solid_unit = solid_unit, config_file = args.config)
 
     # inverse problem
     runstr = "python " + params['phasing']['script'] + ' ' + \
