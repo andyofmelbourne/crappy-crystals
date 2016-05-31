@@ -3,6 +3,7 @@ import sys
 import os
 import ConfigParser
 import time
+import re
 
 import crappy_crystals
 import crappy_crystals.utils
@@ -10,19 +11,49 @@ from crappy_crystals import utils
 from crappy_crystals import phasing
 from crappy_crystals.phasing.maps import *
 from crappy_crystals.phasing.era import ERA
+from crappy_crystals.phasing.dm  import DM
+
+def config_iters_to_alg_num(string):
+    # split a string like '100ERA 200DM 50ERA' with the numbers
+    steps = re.split('(\d+)', string)   # ['', '100', 'ERA ', '200', 'DM ', '50', 'ERA']
+    
+    # get rid of empty strings
+    steps = [s for s in steps if len(s)>0] # ['100', 'ERA ', '200', 'DM ', '50', 'ERA']
+
+    # pair alg and iters
+    # [['ERA', 100], ['DM', 200], ['ERA', 50]]
+    alg_iters = [ [steps[i+1].strip(), int(steps[i])] for i in range(0, len(steps), 2)]
+    return alg_iters
 
 
 def phase(I, solid_support, params, good_pix = None, solid_known = None):
     
     d0 = time.time()
-    solid_ret, info = ERA(I, params['phasing']['era'], solid_support, params, \
-                          mask = good_pix, O = None, \
-                          background = None, method = 1, hardware = 'cpu', \
-                          alpha = 1.0e-10, dtype = 'double', full_output = True)
+
+    alg_iters = config_iters_to_alg_num(params['phasing']['iters'])
+    
+    solid_ret = None
+    eMod = []
+    for alg, iters in alg_iters :
+
+        if alg == 'ERA':
+            solid_ret, info = ERA(I, iters, solid_support, params, \
+                                  mask = good_pix, O = solid_ret, \
+                                  background = None, method = 1, hardware = 'cpu', \
+                                  alpha = 1.0e-10, dtype = 'double', full_output = True)
+            eMod += info['eMod']
+        
+        if alg == 'DM':
+            solid_ret, info = DM(I, iters, solid_support, params, \
+                                  mask = good_pix, O = solid_ret, \
+                                  background = None, method = 1, hardware = 'cpu', \
+                                  alpha = 1.0e-10, dtype = 'double', full_output = True)
+            eMod += info['eMod']
     d1 = time.time()
     print '\n\nTime (s):', d1 - d0
     
-    return solid_ret, info['I'], np.array(info['eMod']), np.zeros_like(info['eMod'])
+    return solid_ret, info['I'], np.array(eMod), np.zeros_like(eMod)
+
 
 if __name__ == "__main__":
     args = utils.io_utils.parse_cmdline_args_phasing()
@@ -39,4 +70,4 @@ if __name__ == "__main__":
             data_retrieved = diff_ret, sample_support = kwargs['sample_support'], \
             sample_support_retrieved = kwargs['sample_support'], good_pix = kwargs['good_pix'], \
             solid_unit = kwargs['solid_unit'], solid_unit_retrieved = solid_ret, modulus_error = emod, \
-            fidelity_error = efid)
+            fidelity_error = efid, config_file = kwargs['config_file_name'])

@@ -130,6 +130,7 @@ def write_input_output_h5(fnam, **kwargs):
         solid_unit_init
         solid_unit_retrieved
         config_file
+        config_file_name 
     """
     import h5py
     if_exists_del(fnam)
@@ -146,6 +147,7 @@ def write_input_output_h5(fnam, **kwargs):
             for line in g:
                 h += line
             f.create_dataset('config_file', data = np.array(h))
+            f.create_dataset('config_file_name', data = np.array(value))
         elif value.dtype == bool :
             print 'writing:', key, value.shape, value.dtype
             f.create_dataset(key, data = value.astype(np.int16))
@@ -171,6 +173,7 @@ def read_input_output_h5(fnam):
         solid_unit
         solid_unit retrieved
         config_file
+        config_file_name 
     """
     import h5py
     
@@ -187,7 +190,7 @@ def read_input_output_h5(fnam):
             import ConfigParser
             import StringIO
             config_file = StringIO.StringIO(config_file)
-
+            
             config = ConfigParser.ConfigParser()
             config.readfp(config_file)
             params = parse_parameters(config)
