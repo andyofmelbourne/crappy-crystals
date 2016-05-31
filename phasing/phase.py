@@ -19,7 +19,7 @@ def config_iters_to_alg_num(string):
     
     # get rid of empty strings
     steps = [s for s in steps if len(s)>0] # ['100', 'ERA ', '200', 'DM ', '50', 'ERA']
-
+    
     # pair alg and iters
     # [['ERA', 100], ['DM', 200], ['ERA', 50]]
     alg_iters = [ [steps[i+1].strip(), int(steps[i])] for i in range(0, len(steps), 2)]
@@ -37,7 +37,7 @@ def phase(I, solid_support, params, good_pix = None, solid_known = None):
         print 'sample update: fixed support with ', np.sum(support), 'voxels'
     
     d0 = time.time()
-
+    
     alg_iters = config_iters_to_alg_num(params['phasing']['iters'])
     
     solid_ret = None
@@ -47,7 +47,7 @@ def phase(I, solid_support, params, good_pix = None, solid_known = None):
         if alg == 'ERA':
             solid_ret, info = ERA(I, iters, support, params, \
                                   mask = good_pix, O = solid_ret, \
-                                  background = None, method = 1, hardware = 'cpu', \
+                                  background = None, method = 1, hardware = params['phasing']['hardware'], \
                                   alpha = 1.0e-10, dtype = 'double', full_output = True)
             eMod += info['eMod']
         

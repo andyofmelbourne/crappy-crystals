@@ -1,4 +1,5 @@
 import numpy as np
+import afnumpy as ap
 import sys
 
 import crappy_crystals
@@ -28,7 +29,7 @@ class Mappings():
             print '\ncrystal space group: P1'
             self.sym_ops_obj = sym_ops.P1(params['crystal']['unit_cell'], params['detector']['shape'])
         elif params['crystal']['space_group'] == 'P212121':
-            import crappy_crystals.symmetry_operations.P212121 as sym_ops 
+            import crappy_crystals.symmetry_operations.P212121_gpu as sym_ops 
             self.sym_ops_obj = sym_ops.P212121(params['crystal']['unit_cell'], params['detector']['shape'])
             print '\ncrystal space group: P212121'
         
@@ -40,17 +41,19 @@ class Mappings():
         self.N          = params['disorder']['n']
         self.exp        = make_exp(params['disorder']['sigma'], params['detector']['shape'])
         self.lattice    = sym_ops.lattice(params['crystal']['unit_cell'], params['detector']['shape'])
-        self.solid_syms = lambda x : sym_ops.solid_syms(x)
         self.DB         = None
+
+        self.exp     = ap.array(self.exp)
+        self.lattice = ap.array(self.lattice)
     
     def modes(self, solid_syms):
         if self.DB is None :
-            self.DB = np.zeros((2,) + solid_syms.shape[1 :], dtype=solid_syms.real.dtype)
+            self.DB = ap.zeros((2,) + solid_syms.shape[1 :], dtype=solid_syms.real.dtype)
         
         # diffuse term (incoherent sum)
-        self.DB[0] = (1. - self.exp) * np.sum((solid_syms.conj() * solid_syms).real, axis=0)
+        self.DB[0] = (1. - self.exp) * ap.sum(ap.abs(solid_syms)**2, axis=0)
         # brag term (coherent sum)
-        B     = np.sum(solid_syms, axis=0)
+        B     = ap.sum(solid_syms, axis=0)
         self.DB[1] = self.N * self.exp * self.lattice * (B.conj() * B).real
         return self.DB
 
@@ -60,8 +63,8 @@ class Mappings():
         
         modes = self.modes(solid_syms)
         
-        diff = np.sum(modes, axis=0)
-        return diff
+        diff = ap.sum(modes, axis=0)
+        return np.array(diff)
 
 
 def update_progress(progress, algorithm, i, emod, esup):

@@ -47,7 +47,7 @@ def phase(I, solid_support, params, good_pix = None, solid_known = None):
         if alg == 'ERA':
             solid_ret, info = ERA(I, iters, support, params, \
                                   mask = good_pix, O = solid_ret, \
-                                  background = None, method = 1, hardware = 'cpu', \
+                                  background = None, method = 1, hardware = params['phasing']['hardware'], \
                                   alpha = 1.0e-10, dtype = 'double', full_output = True)
             eMod += info['eMod']
         

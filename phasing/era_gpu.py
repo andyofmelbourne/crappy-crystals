@@ -38,17 +38,13 @@ Psup . o = o * S
 """
 
 import numpy as np
-import maps
+import maps_gpu as maps
 from   maps import update_progress
 
 import crappy_crystals
 from crappy_crystals.utils.l2norm import l2norm
 
 def ERA(I, iters, support, params, mask = 1, O = None, background = None, method = 1, hardware = 'cpu', alpha = 1.0e-10, dtype = 'single', full_output = True):
-    if hardware == 'gpu':
-        import era_gpu
-        return era_gpu.ERA(I, iters, support, params, mask, O, background, method, hardware, alpha, dtype, full_output)
-    
     if dtype is None :
         dtype   = I.dtype
         c_dtype = (I[0,0,0] + 1J * I[0, 0, 0]).dtype
