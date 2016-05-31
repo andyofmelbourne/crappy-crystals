@@ -150,7 +150,7 @@ def make_crystal(fnam):
     diff += (1. - exp) * np.sum(np.abs(modes)**2, axis=0)
 
 
-    fourier_space_crystal = np.sum(modes, axis=0) * lattice
+    fourier_space_crystal = np.sum(modes, axis=0) #* lattice
     real_space_crystal    = np.fft.ifftn(fourier_space_crystal)
     real_space_crystal    = np.fft.fftshift(real_space_crystal)
 
@@ -158,11 +158,12 @@ def make_crystal(fnam):
 
 def show_crystal(fnam):
     c   = make_crystal(fnam)
-    iso = Iso_surface(c.real[::2,::2,::2], c.real.max()*0.9)
+    c[c.real < 0] = 0
+    iso = Iso_surface(np.abs(c.real))
 
 
 class Iso_surface():
-    def __init__(self, data, lvl):
+    def __init__(self, data, lvl = 0.8):
         from pyqtgraph.Qt import QtCore, QtGui
         import pyqtgraph as pg
         import pyqtgraph.opengl as gl
@@ -170,36 +171,50 @@ class Iso_surface():
         app = QtGui.QApplication([])
         w = gl.GLViewWidget()
         w.show()
-        w.setWindowTitle('pyqtgraph example: GLIsosurface')
+        w.setWindowTitle('crystal unit cell')
 
-        w.setCameraPosition(distance=40)
+        w.setCameraPosition(distance=data.shape[0])
 
-        g = gl.GLGridItem()
-        g.scale(2,2,2)
-        w.addItem(g)
-
+        #g = gl.GLGridItem()
+        #g.scale(2,2,2)
+        #w.addItem(g)
+        gx = gl.GLGridItem()
+        gx.rotate(90, 0, 1, 0)
+        gx.scale(data.shape[0]/20.,data.shape[1]/20.,data.shape[2]/20.)
+        gx.translate(-data.shape[0]/2, 0, 0)
+        w.addItem(gx)
+        gy = gl.GLGridItem()
+        gy.rotate(90, 1, 0, 0)
+        gy.scale(data.shape[0]/20.,data.shape[1]/20.,data.shape[2]/20.)
+        gy.translate(0, -data.shape[1]/2, 0)
+        w.addItem(gy)
+        gz = gl.GLGridItem()
+        gz.scale(data.shape[0]/20.,data.shape[1]/20.,data.shape[2]/20.)
+        gz.translate(0, 0, -data.shape[1]/2)
+        w.addItem(gz)
+        
         import numpy as np
         
         print("Generating isosurface..")
-        verts, faces = pg.isosurface(data, data.max()/4.)
-
+        verts, faces = pg.isosurface(data, data.max()*lvl)
+        
         md = gl.MeshData(vertexes=verts, faces=faces)
-
+        
         colors = np.ones((md.faceCount(), 4), dtype=float)
         colors[:,3] = 0.2
         colors[:,2] = np.linspace(0, 1, colors.shape[0])
         md.setFaceColors(colors)
-        m1 = gl.GLMeshItem(meshdata=md, smooth=False, shader='balloon')
-        m1.setGLOptions('additive')
+        #m1 = gl.GLMeshItem(meshdata=md, smooth=False, shader='balloon')
+        #m1.setGLOptions('additive')
 
         #w.addItem(m1)
-        m1.translate(-25, -25, -20)
+        #m1.translate(-data.shape[0]/2, -data.shape[1]/2, -data.shape[2]/2)
 
         m2 = gl.GLMeshItem(meshdata=md, smooth=True, shader='balloon')
         m2.setGLOptions('additive')
 
         w.addItem(m2)
-        m2.translate(-25, -25, -50)
+        m2.translate(-data.shape[0]/2, -data.shape[1]/2, -data.shape[2]/2)
         app.exec_()
 
 class Application():
@@ -290,6 +305,8 @@ def parse_cmdline_args():
     parser = argparse.ArgumentParser(prog = 'display.py', description='display the contents of output.h5 in a GUI')
     parser.add_argument('path', type=str, \
                         help="path to output.h5 file")
+    parser.add_argument('-i', '--isosurface', action='store_true', \
+                        help="display the crystal in the field of view as an iso surface")
     args = parser.parse_args()
 
     # check that args.ini exists
@@ -302,10 +319,12 @@ def parse_cmdline_args():
 if __name__ == '__main__':
     args = parse_cmdline_args()
     
-    # read the h5 file 
-    kwargs = read_input_output_h5(args.path)
-    
-    signal.signal(signal.SIGINT, signal.SIG_DFL)    # allow Control-C
-    app = QtGui.QApplication(sys.argv)
-    
-    ex  = Application(**kwargs)
+    if args.isosurface :
+        show_crystal(args.path)
+    else :
+        # read the h5 file 
+        kwargs = read_input_output_h5(args.path)
+        
+        signal.signal(signal.SIGINT, signal.SIG_DFL)    # allow Control-C
+        app = QtGui.QApplication(sys.argv)
+        ex  = Application(**kwargs)
