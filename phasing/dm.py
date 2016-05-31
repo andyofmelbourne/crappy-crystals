@@ -23,7 +23,7 @@ def DM(I, iters, support, params, mask = 1, O = None, background = None, method 
         O  = np.random.random((I.shape)).astype(c_dtype)
         # support proj
         if type(support) is int :
-            S = choose_N_highest_pixels( (O * O.conj()).real, support)
+            S = era.choose_N_highest_pixels( (O * O.conj()).real, support)
         else :
             S = support
         O = O * S
@@ -97,8 +97,8 @@ def DM(I, iters, support, params, mask = 1, O = None, background = None, method 
         
         if full_output : 
             info = {}
-            info['plan'] = info['queue'] = None
-            info['I']    = Imap(np.fft.fftn(O0))
+            info['I']       = Imap(np.fft.fftn(O0))
+            info['support'] = S
             if background is not None :
                 background, rs, r_av = era.radial_symetry(background**2, rs = rs)
                 info['background'] = background

@@ -94,7 +94,7 @@ def make_crystal(fnam):
     diff += (1. - exp) * np.sum(np.abs(modes)**2, axis=0)
 
 
-    fourier_space_crystal = np.sum(modes, axis=0) #* lattice
+    fourier_space_crystal = np.sum(modes, axis=0) * lattice
     real_space_crystal    = np.fft.ifftn(fourier_space_crystal)
     real_space_crystal    = np.fft.fftshift(real_space_crystal)
 
@@ -107,7 +107,7 @@ def show_crystal(fnam):
 
 
 class Iso_surface():
-    def __init__(self, data, lvl = 0.8):
+    def __init__(self, data, lvl = 0.6):
         from pyqtgraph.Qt import QtCore, QtGui
         import pyqtgraph as pg
         import pyqtgraph.opengl as gl

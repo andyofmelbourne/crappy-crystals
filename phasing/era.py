@@ -58,7 +58,7 @@ def ERA(I, iters, support, params, mask = 1, O = None, background = None, method
         c_dtype = np.complex128
 
     if O is None :
-        O  = np.random.random((I.shape)).astype(c_dtype)
+        O  = (np.random.random((I.shape)) + 0J).astype(c_dtype)
         # support proj
         if type(support) is int :
             S = choose_N_highest_pixels( (O * O.conj()).real, support)
@@ -114,11 +114,11 @@ def ERA(I, iters, support, params, mask = 1, O = None, background = None, method
                 background, rs, r_av = radial_symetry(background.copy(), rs = rs)
             
             # metrics
-            O2 = O.copy()
+            O2   = O.copy()
+            eCon = l2norm(O2, O0)
             
-            eCon   = l2norm(O2, O0)
-            
-            eMod   = l2norm(O1, O0)
+            eMod  = model_error(amp, O, Imap, mask, background = background)
+            eMod  = np.sqrt( eMod / I_norm )
             
             update_progress(i / max(1.0, float(iters-1)), 'ERA', i, eCon, eMod )
             
@@ -127,8 +127,8 @@ def ERA(I, iters, support, params, mask = 1, O = None, background = None, method
         
         if full_output : 
             info = {}
-            info['plan'] = info['queue'] = None
             info['I']    = Imap(np.fft.fftn(O))
+            info['support'] = S
             if background is not None :
                 background, rs, r_av = radial_symetry(background**2, rs = rs)
                 info['background'] = background
@@ -139,6 +139,15 @@ def ERA(I, iters, support, params, mask = 1, O = None, background = None, method
             return O, info
         else :
             return O
+
+def model_error(amp, O, Imap, mask, background = None):
+    O   = np.fft.fftn(O)
+    if background is not None :
+        M   = np.sqrt(Imap(O) + background**2)
+    else :
+        M   = np.sqrt(Imap(O))
+    err = np.sum( mask * (M - amp)**2 ) 
+    return err
 
 def choose_N_highest_pixels(array, N):
     percent = (1. - float(N) / float(array.size)) * 100.

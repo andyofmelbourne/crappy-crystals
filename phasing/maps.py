@@ -43,14 +43,22 @@ class Mappings():
         self.solid_syms = lambda x : sym_ops.solid_syms(x)
     
     def modes(self, solid_syms):
-        modes = np.zeros((solid_syms.shape[0] + 1,) + solid_syms.shape[1 :], dtype=solid_syms.dtype)
+        #modes = np.zeros((solid_syms.shape[0] + 1,) + solid_syms.shape[1 :], dtype=solid_syms.dtype)
         
         # solid unit mapping
-        modes[:-1] = np.sqrt(1. - self.exp) * solid_syms
+        #modes[:-1] = np.sqrt(1. - self.exp) * solid_syms
         
         # unit cell mapping 
-        modes[-1]  = np.sqrt(self.N * self.exp) * self.lattice * np.sum(solid_syms, axis=0)
-        return modes
+        #modes[-1]  = np.sqrt(self.N * self.exp) * self.lattice * np.sum(solid_syms, axis=0)
+
+        DB = np.zeros((2,) + solid_syms.shape[1 :], dtype=solid_syms.real.dtype)
+        
+        # diffuse term (incoherent sum)
+        DB[0] = (1. - self.exp) * np.sum((solid_syms.conj() * solid_syms).real, axis=0)
+        # brag term (coherent sum)
+        B     = np.sum(solid_syms, axis=0)
+        DB[1] = self.N * self.exp * self.lattice * (B.conj() * B).real
+        return DB
 
     def make_diff(self, solid = None, solid_syms = None):
         if solid_syms is None :
@@ -58,7 +66,7 @@ class Mappings():
         
         modes = self.modes(solid_syms)
         
-        diff = np.sum(np.abs(modes)**2, axis=0)
+        diff = np.sum(modes, axis=0)
         return diff
 
 
