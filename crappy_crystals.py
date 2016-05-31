@@ -40,6 +40,15 @@ def generate_diff(config):
     else :
         edges = np.ones_like(diff, dtype=np.bool)
 
+    # add gaus background
+    if 'background' in config['simulation'] and config['simulation']['background'] == 'gaus':
+        sig   = config['simulation']['background_std']
+        scale = config['simulation']['background_scale']
+        scale *= diff.max()
+        print '\nAdding gaussian to diff scale (absolute), std:', scale, sig
+        gaus = utils.gaus.gaus(diff.shape, scale, sig)
+        diff += gaus
+
     # define the solid_unit support
     if config['simulation']['support_frac'] is not None :
         support = utils.padding.expand_region_by(solid_unit_expanded > 0.1, config['simulation']['support_frac'])

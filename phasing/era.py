@@ -79,11 +79,14 @@ def ERA(I, iters, support, params, mask = 1, O = None, background = None, method
     
     if background is not None :
         if background is True :
+            print 'generating random background...'
             background = np.random.random((I.shape)).astype(dtype)
         else :
+            print 'using defined background'
             background = np.sqrt(background)
         rs = None
-    
+    else :
+        print 'no background'
     
     mapper = maps.Mappings(params)
     Imap   = lambda x : mapper.make_diff(solid = x)
