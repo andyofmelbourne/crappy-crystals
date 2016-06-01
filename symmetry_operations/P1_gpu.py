@@ -1,4 +1,5 @@
 import numpy as np
+import afnumpy as ap
 
 name = 'P1'
 
@@ -24,10 +25,10 @@ class P1():
         # x = x
         T0 = 1
         
-        self.translations = np.array([T0])
+        self.translations = ap.array([T0])
         
         # keep an array for the 4 symmetry related coppies of the solid unit
-        self.syms = np.zeros((1,) + tuple(det_shape), dtype=dtype)
+        self.syms = ap.zeros((1,) + tuple(det_shape), dtype=dtype)
     
     def solid_syms_Fourier(self, solid):
         """
@@ -35,7 +36,7 @@ class P1():
         of the symmetry related partners.
         """
         # x = x
-        self.syms[0] = solid
+        self.syms[0] = ap.array(solid)
         
         self.syms *= self.translations
         return self.syms

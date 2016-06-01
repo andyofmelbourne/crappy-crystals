@@ -38,11 +38,18 @@ Psup . o = o * S
 """
 
 import numpy as np
+import afnumpy as ap
+import afnumpy.fft 
 import maps_gpu as maps
 from   maps import update_progress
 
 import crappy_crystals
-from crappy_crystals.utils.l2norm import l2norm
+
+def l2norm(array1,array2):
+    """Calculate sqrt ( sum |array1 - array2|^2 / sum|array1|^2 )."""
+    tot  = ap.sum((array1 * array1.conj()).real)
+    diff = array1-array2
+    return ap.sqrt(ap.sum((diff * diff.conj()).real)/tot)
 
 def ERA(I, iters, support, params, mask = 1, O = None, background = None, method = 1, hardware = 'cpu', alpha = 1.0e-10, dtype = 'single', full_output = True):
     if dtype is None :
@@ -67,19 +74,22 @@ def ERA(I, iters, support, params, mask = 1, O = None, background = None, method
         O = O * S
     
     O    = O.astype(c_dtype)
+    O    = ap.array(O)
     
-    I_norm    = np.sum(mask * I)
-    amp       = np.sqrt(I).astype(dtype)
+    I_norm    = ap.sum(mask * I)
+    amp       = ap.sqrt(I.astype(dtype))
     eMods     = []
     eCons     = []
     
     if background is not None :
         if background is True :
-            background = np.random.random((I.shape)).astype(dtype)
+            background = ap.random.random((I.shape)).astype(dtype)
         else :
-            background = np.sqrt(background)
+            background = ap.sqrt(background)
         rs = None
     
+    
+    mask = ap.array(mask.astype(np.int))
     
     mapper = maps.Mappings(params)
     Imap   = lambda x : mapper.make_diff(solid = x)
@@ -105,20 +115,22 @@ def ERA(I, iters, support, params, mask = 1, O = None, background = None, method
             
             # support projection 
             if type(support) is int :
-                S = choose_N_highest_pixels( (O * O.conj()).real, support)
+                S = choose_N_highest_pixels( np.array((O * O.conj()).real), support)
+                S = ap.array(S)
             else :
                 S = support
             O = O * S
 
             if background is not None :
-                background, rs, r_av = radial_symetry(background.copy(), rs = rs)
+                bt, rs, r_av = radial_symetry(np.array(background), rs = rs)
+                background   = ap.array(bt)
             
             # metrics
             O2   = O.copy()
             eCon = l2norm(O2, O0)
             
             eMod  = model_error(amp, O, Imap, mask, background = background)
-            eMod  = np.sqrt( eMod / I_norm )
+            eMod  = ap.sqrt( eMod / I_norm )
             
             update_progress(i / max(1.0, float(iters-1)), 'ERA', i, eCon, eMod )
             
@@ -127,10 +139,10 @@ def ERA(I, iters, support, params, mask = 1, O = None, background = None, method
         
         if full_output : 
             info = {}
-            info['I']    = Imap(np.fft.fftn(O))
+            info['I']    = np.array(Imap(ap.fft.fftn(O)))
             info['support'] = S
             if background is not None :
-                background, rs, r_av = radial_symetry(background**2, rs = rs)
+                background, rs, r_av = radial_symetry(np.array(background**2), rs = rs)
                 info['background'] = background
                 info['r_av']       = r_av
                 info['I']         += info['background']
@@ -141,12 +153,12 @@ def ERA(I, iters, support, params, mask = 1, O = None, background = None, method
             return O
 
 def model_error(amp, O, Imap, mask, background = None):
-    O   = np.fft.fftn(O)
+    O   = ap.fft.fftn(O)
     if background is not None :
-        M   = np.sqrt(Imap(O) + background**2)
+        M   = ap.sqrt(Imap(O) + background**2)
     else :
-        M   = np.sqrt(Imap(O))
-    err = np.sum( mask * (M - amp)**2 ) 
+        M   = ap.sqrt(Imap(O))
+    err = ap.sum( mask * (M - amp)**2 ) 
     return err
 
 def choose_N_highest_pixels(array, N):
@@ -186,25 +198,26 @@ def radial_symetry(background, rs = None, is_fft_shifted = True):
     return background, rs, r_av
 
 def pmod(amp, O, Imap, mask = 1, alpha = 1.0e-10):
-    O = np.fft.fftn(O)
+    O = ap.fft.fftn(O)
     O = Pmod(amp, O, Imap(O), mask = mask, alpha = alpha)
-    O = np.fft.ifftn(O)
+    O = ap.fft.ifftn(O)
     return O
     
 def Pmod(amp, O, Imap, mask = 1, alpha = 1.0e-10):
-    M    = mask * amp / np.sqrt(Imap + alpha)
+    print type(O), type(mask), type(amp), type(Imap)
+    M    = mask * amp / ap.sqrt(Imap + alpha)
     out  = O * M
     out += (1 - mask) * O
     return out
 
 def pmod_back(amp, background, O, Imap, mask = 1, alpha = 1.0e-10):
-    O = np.fft.fftn(O)
+    O = ap.fft.fftn(O)
     O, background = Pmod_back(amp, background, O, Imap(O), mask = mask, alpha = alpha)
-    O = np.fft.ifftn(O)
+    O = ap.fft.ifftn(O)
     return O, background
     
 def Pmod_back(amp, background, O, Imap, mask = 1, alpha = 1.0e-10):
-    M = mask * amp / np.sqrt(Imap + background**2 + alpha)
+    M = mask * amp / ap.sqrt(Imap + background**2 + alpha)
     out         = O * M
     background *= M
     out += (1 - mask) * O

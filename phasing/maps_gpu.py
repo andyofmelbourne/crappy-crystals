@@ -25,7 +25,7 @@ class Mappings():
     """
     def __init__(self, params):
         if params['crystal']['space_group'] == 'P1':
-            import crappy_crystals.symmetry_operations.P1 as sym_ops 
+            import crappy_crystals.symmetry_operations.P1_gpu as sym_ops 
             print '\ncrystal space group: P1'
             self.sym_ops_obj = sym_ops.P1(params['crystal']['unit_cell'], params['detector']['shape'])
         elif params['crystal']['space_group'] == 'P212121':
@@ -64,7 +64,7 @@ class Mappings():
         modes = self.modes(solid_syms)
         
         diff = ap.sum(modes, axis=0)
-        return np.array(diff)
+        return diff
 
 
 def update_progress(progress, algorithm, i, emod, esup):
