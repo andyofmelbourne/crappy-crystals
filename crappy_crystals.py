@@ -49,6 +49,8 @@ def generate_diff(config):
         gaus = utils.gaus.gaus(diff.shape, scale, sig)
         diff += gaus
         background = gaus
+    else :
+        background = None
 
     # define the solid_unit support
     if config['simulation']['support_frac'] is not None :
@@ -99,12 +101,13 @@ if __name__ == "__main__":
     
     # forward problem
     if params['simulation']['sample'] == 'duck':
-        diff, beamstop, edges, support, solid_unit = generate_diff(params)
+        diff, beamstop, edges, support, solid_unit, background = generate_diff(params)
         
         # write to file
         fnam = os.path.join(params['output']['path'], 'input.h5')
+        mask = beamstop * edges
         utils.io_utils.write_input_output_h5(fnam, data = diff, sample_support = support, \
-                good_pix = beamstop + edges, solid_unit = solid_unit, background = background,\
+                good_pix = mask, solid_unit = solid_unit, background = background,\
                 config_file = args.config)
 
     # inverse problem

@@ -239,6 +239,33 @@ class Application():
         ## Display the widget as a new window
         w.show()
 
+        
+        if 'B_rav' in kwargs.keys():
+            B_rav = kwargs['B_rav']
+            
+            # Define a top-level widget to hold everything
+            w3 = QtGui.QWidget()
+
+            # line plots of the B_rav
+            self.plot_B_rav = pg.PlotWidget()
+
+            Vsplitter = QtGui.QSplitter(QtCore.Qt.Vertical) 
+
+            Hsplitter = QtGui.QSplitter(QtCore.Qt.Horizontal)
+            Hsplitter.addWidget(self.plot_B_rav)
+            Vsplitter.addWidget(Hsplitter)
+            
+            hlayout_tot = QtGui.QHBoxLayout()
+            hlayout_tot.addWidget(Vsplitter)
+
+            w3.setLayout(hlayout_tot)
+            
+            self.plot_B_rav.plot(B_rav)
+            self.plot_B_rav.setTitle('radial average of the background')
+            
+            ## Display the widget as a new window
+            w3.show()
+
         print 'showing'
         ## Start the Qt event loop
 

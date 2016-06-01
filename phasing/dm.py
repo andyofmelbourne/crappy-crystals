@@ -40,6 +40,7 @@ def DM(I, iters, support, params, mask = 1, O = None, background = None, method 
         if background is True :
             print 'generating random background...'
             background = np.random.random((I.shape)).astype(dtype)
+            background[background < 0.1] = 0.1
         else :
             print 'using defined background'
             background = np.sqrt(background)

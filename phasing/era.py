@@ -81,6 +81,7 @@ def ERA(I, iters, support, params, mask = 1, O = None, background = None, method
         if background is True :
             print 'generating random background...'
             background = np.random.random((I.shape)).astype(dtype)
+            background[background < 0.1] = 0.1
         else :
             print 'using defined background'
             background = np.sqrt(background)
@@ -172,7 +173,7 @@ def radial_symetry(background, rs = None, is_fft_shifted = True):
         j = np.fft.fftfreq(background.shape[1]) * background.shape[1]
         k = np.fft.fftfreq(background.shape[2]) * background.shape[2]
         i, j, k = np.meshgrid(i, j, k, indexing='ij')
-        rs      = np.sqrt(i**2 + j**2 + k**2).astype(np.int16)
+        rs      = np.rint(np.sqrt(i**2 + j**2 + k**2)).astype(np.int16)
         
         if is_fft_shifted is False :
             rs = np.fft.fftshift(rs)
@@ -191,6 +192,22 @@ def radial_symetry(background, rs = None, is_fft_shifted = True):
     ########### Make a large background filled with the radial average
     background = r_av[rs].reshape(background.shape)
     return background, rs, r_av
+
+def radial_average_to_array(r_av, shape, is_fft_shifted = True):
+    i = np.fft.fftfreq(shape[0]) * shape[0]
+    j = np.fft.fftfreq(shape[1]) * shape[1]
+    k = np.fft.fftfreq(shape[2]) * shape[2]
+    i, j, k = np.meshgrid(i, j, k, indexing='ij')
+    rs      = np.rint(np.sqrt(i**2 + j**2 + k**2)).astype(np.int16)
+    
+    if is_fft_shifted is False :
+        rs = np.fft.fftshift(rs)
+    rs = rs.ravel()
+
+    background = r_av[rs].reshape(shape)
+    return background
+
+
 
 def pmod(amp, O, Imap, mask = 1, alpha = 1.0e-10):
     O = np.fft.fftn(O)

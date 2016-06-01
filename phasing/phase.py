@@ -37,15 +37,12 @@ def phase(I, solid_support, params, good_pix = None, solid_known = None):
         print 'sample update: fixed support with ', np.sum(support), 'voxels'
     
     # background
+    background = None
     if 'background' in params['phasing'].keys() :
-        if params['phasing']['background'] is None :
-            background = None
-        else :
+        if params['phasing']['background'] is True :
             background = True
-    else :
-        background = None
 
-    print 'background:', background
+    print 'background:', background, params['phasing']['background']
     
     d0 = time.time()
     
@@ -55,28 +52,36 @@ def phase(I, solid_support, params, good_pix = None, solid_known = None):
     eMod = []
     for alg, iters in alg_iters :
 
+        print alg, iters
+
         if alg == 'ERA':
             solid_ret, info = ERA(I, iters, support, params, \
                                   mask = good_pix, O = solid_ret, \
                                   background = background, method = 1, hardware = params['phasing']['hardware'], \
                                   alpha = 1.0e-10, dtype = 'double', full_output = True)
+                    
             eMod += info['eMod']
             if 'background' in info.keys():
                 background = info['background']
+            else :
+                info['r_av'] = None
         
         if alg == 'DM':
             solid_ret, info = DM(I, iters, support, params, \
                                   mask = good_pix, O = solid_ret, \
                                   background = background, method = 1, hardware = params['phasing']['hardware'], \
                                   alpha = 1.0e-10, dtype = 'double', full_output = True)
+
             eMod += info['eMod']
             if 'background' in info.keys():
                 background = info['background']
+            else :
+                info['r_av'] = None
 
     d1 = time.time()
     print '\n\nTime (s):', d1 - d0
     
-    return solid_ret, info['I'], info['support'], np.array(eMod), np.zeros_like(eMod)
+    return solid_ret, info['I'], info['support'], info['r_av'], np.array(eMod), np.zeros_like(eMod)
 
 
 if __name__ == "__main__":
@@ -85,7 +90,7 @@ if __name__ == "__main__":
     # read the h5 file
     kwargs = utils.io_utils.read_input_output_h5(args.input)
     
-    solid_ret, diff_ret, support_ret, emod, efid = phase(kwargs['data'], kwargs['sample_support'], kwargs['config_file'], \
+    solid_ret, diff_ret, support_ret, B_rav, emod, efid = phase(kwargs['data'], kwargs['sample_support'], kwargs['config_file'], \
                                 good_pix = kwargs['good_pix'], solid_known = kwargs['solid_unit'])
     
     # write the h5 file 
@@ -94,4 +99,4 @@ if __name__ == "__main__":
             data_retrieved = diff_ret, sample_support = kwargs['sample_support'], \
             sample_support_retrieved = support_ret, good_pix = kwargs['good_pix'], \
             solid_unit = kwargs['solid_unit'], solid_unit_retrieved = solid_ret, modulus_error = emod, \
-            fidelity_error = efid, config_file = kwargs['config_file_name'])
+            fidelity_error = efid, config_file = kwargs['config_file_name'], B_rav = B_rav)
