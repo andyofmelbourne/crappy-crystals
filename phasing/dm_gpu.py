@@ -1,17 +1,16 @@
 import numpy as np
-import maps
 from   maps import update_progress
 import era
+import era_gpu
+
+import afnumpy as ap
+import afnumpy.fft 
+import maps_gpu as maps
 
 import crappy_crystals
 from crappy_crystals.utils.l2norm import l2norm
 
 def DM(I, iters, support, params, mask = 1, O = None, background = None, method = 1, hardware = 'cpu', alpha = 1.0e-10, dtype = 'single', full_output = True):
-
-    if hardware == 'gpu':
-        import dm_gpu
-        return dm_gpu.DM(I, iters, support, params, mask, O, background, method, hardware, alpha, dtype, full_output)
-    
     if dtype is None :
         dtype   = I.dtype
         c_dtype = (I[0,0,0] + 1J * I[0, 0, 0]).dtype
@@ -24,35 +23,41 @@ def DM(I, iters, support, params, mask = 1, O = None, background = None, method 
         dtype   = np.float64
         c_dtype = np.complex128
 
-    if O is None :
-        O  = np.random.random((I.shape)).astype(c_dtype)
-        # support proj
-        if type(support) is int :
-            S = era.choose_N_highest_pixels( (O * O.conj()).real, support)
-        else :
-            S = support
-        O = O * S
+    # support proj
+    if type(support) is int :
+        S = era.choose_N_highest_pixels( (O * O.conj()).real, support)
+        S = ap.array(S)
+    else :
+        support = ap.array(support)
+        S = support
     
+    if O is None :
+        O  = (np.random.random((I.shape)) + 0J).astype(c_dtype)
+        O = O * S
+
     O    = O.astype(c_dtype)
+    O    = ap.array(O)
     O0   = O.copy()
     
-    I_norm    = np.sum(mask * I)
-    amp       = np.sqrt(I).astype(dtype)
+    I_norm    = ap.array(np.sum(mask * I))
+    amp       = ap.array(np.sqrt(I).astype(dtype))
     eMods     = []
     eCons     = []
     
     if background is not None :
         if background is True :
             print 'generating random background...'
-            background = np.random.random((I.shape)).astype(dtype)
+            background = ap.random.random((I.shape)).astype(dtype)
             background[background < 0.1] = 0.1
         else :
             print 'using defined background'
-            background = np.sqrt(background)
+            background = ap.sqrt(background)
         b0 = background.copy()
         rs = None
     else :
         print 'no background'
+    
+    mask = ap.array(mask.astype(np.int))
     
     mapper = maps.Mappings(params)
     Imap   = lambda x : mapper.make_diff(solid = x)
@@ -71,13 +76,15 @@ def DM(I, iters, support, params, mask = 1, O = None, background = None, method 
             
             # support projection 
             if type(support) is int :
-                S = era.choose_N_highest_pixels( (O * O.conj()).real, support)
+                S = era.choose_N_highest_pixels( np.array((O * O.conj()).real), support)
             else :
                 S = support
+                S = ap.array(S)
             O0 = O * S
 
             if background is not None :
-                b0, rs, r_av = era.radial_symetry(background, rs = rs)
+                background_t, rs, r_av = era.radial_symetry(np.array(background), rs = rs)
+                b0 = ap.array(background_t)
 
             O          -= O0
             O0         -= O
@@ -85,19 +92,19 @@ def DM(I, iters, support, params, mask = 1, O = None, background = None, method 
             if background is not None :
                 background -= b0
                 b0         -= background
-                O0, b0      = era.pmod_back(amp, b0, O0, Imap, mask, alpha = alpha)
+                O0, b0      = era_gpu.pmod_back(amp, b0, O0, Imap, mask, alpha = alpha)
                 background += b0
             else :
-                O0 = era.pmod(amp, O0, Imap, mask, alpha = alpha)
+                O0 = era_gpu.pmod(amp, O0, Imap, mask, alpha = alpha)
             O  += O0
 
             # metrics
-            eCon   = l2norm(O_bak, O)
+            eCon   = era_gpu.l2norm(O_bak, O)
             
             # f* = Ps f_i = PM (2 Ps f_i - f_i)
             O0    = O * S
-            eMod  = model_error(amp, O0, Imap, mask, background = background)
-            eMod  = np.sqrt( eMod / I_norm )
+            eMod  = era_gpu.model_error(amp, O0, Imap, mask, background = background)
+            eMod  = ap.sqrt( eMod / I_norm )
 
             update_progress(i / max(1.0, float(iters-1)), 'DM', i, eCon, eMod )
             
@@ -106,24 +113,17 @@ def DM(I, iters, support, params, mask = 1, O = None, background = None, method 
         
         if full_output : 
             info = {}
-            info['I']       = Imap(np.fft.fftn(O0))
-            info['support'] = S
+            info['I']       = np.array(Imap(ap.fft.fftn(O0)))
+            info['support'] = np.array(S)
             if background is not None :
+                background           = np.array(background)
                 background, rs, r_av = era.radial_symetry(background**2, rs = rs)
                 info['background'] = background
                 info['r_av']       = r_av
                 info['I']         += info['background']
             info['eMod']  = eMods
             info['eCon']  = eCons
-            return O0, info
+            return np.array(O0), info
         else :
-            return O0
+            return np.array(O0)
 
-def model_error(amp, O, Imap, mask, background = None):
-    O   = np.fft.fftn(O)
-    if background is not None :
-        M   = np.sqrt(Imap(O) + background**2)
-    else :
-        M   = np.sqrt(Imap(O))
-    err = np.sum( mask * (M - amp)**2 ) 
-    return err

@@ -149,7 +149,7 @@ def ERA(I, iters, support, params, mask = 1, O = None, background = None, method
             info['support'] = np.array(S)
             if background is not None :
                 background = np.array(background)
-                background, rs, r_av = radial_symetry(background**2, rs = rs)
+                background, rs, r_av = era.radial_symetry(background**2, rs = rs)
                 info['background'] = background
                 info['r_av']       = r_av
                 info['I']         += info['background']
