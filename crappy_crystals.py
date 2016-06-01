@@ -40,6 +40,16 @@ def generate_diff(config):
     else :
         edges = np.ones_like(diff, dtype=np.bool)
 
+    # add gaus background
+    if 'background' in config['simulation'] and config['simulation']['background'] == 'gaus':
+        sig   = config['simulation']['background_std']
+        scale = config['simulation']['background_scale']
+        scale *= diff.max()
+        print '\nAdding gaussian to diff scale (absolute), std:', scale, sig
+        gaus = utils.gaus.gaus(diff.shape, scale, sig)
+        diff += gaus
+        background = gaus
+
     # define the solid_unit support
     if config['simulation']['support_frac'] is not None :
         support = utils.padding.expand_region_by(solid_unit_expanded > 0.1, config['simulation']['support_frac'])
@@ -57,7 +67,7 @@ def generate_diff(config):
     print 'Simulation: number of voxels in support   :', np.sum(support)
 
 
-    return diff, beamstop, edges, support, solid_unit_expanded
+    return diff, beamstop, edges, support, solid_unit_expanded, background
 
 
 if __name__ == "__main__":
@@ -94,7 +104,8 @@ if __name__ == "__main__":
         # write to file
         fnam = os.path.join(params['output']['path'], 'input.h5')
         utils.io_utils.write_input_output_h5(fnam, data = diff, sample_support = support, \
-                good_pix = beamstop + edges, solid_unit = solid_unit, config_file = args.config)
+                good_pix = beamstop + edges, solid_unit = solid_unit, background = background,\
+                config_file = args.config)
 
     # inverse problem
     runstr = "python " + params['phasing']['script'] + ' ' + \

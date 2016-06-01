@@ -239,7 +239,9 @@ class Application():
         ## Display the widget as a new window
         w.show()
 
+        print 'showing'
         ## Start the Qt event loop
+
         sys.exit(app.exec_())
         
         
@@ -270,5 +272,5 @@ if __name__ == '__main__':
         kwargs = read_input_output_h5(args.path)
         
         signal.signal(signal.SIGINT, signal.SIG_DFL)    # allow Control-C
-        app = QtGui.QApplication(sys.argv)
+        #app = QtGui.QApplication(sys.argv)
         ex  = Application(**kwargs)

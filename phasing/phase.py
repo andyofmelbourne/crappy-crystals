@@ -36,6 +36,17 @@ def phase(I, solid_support, params, good_pix = None, solid_known = None):
         support = solid_support
         print 'sample update: fixed support with ', np.sum(support), 'voxels'
     
+    # background
+    if 'background' in params['phasing'].keys() :
+        if params['phasing']['background'] is None :
+            background = None
+        else :
+            background = True
+    else :
+        background = None
+
+    print 'background:', background
+    
     d0 = time.time()
     
     alg_iters = config_iters_to_alg_num(params['phasing']['iters'])
@@ -47,16 +58,21 @@ def phase(I, solid_support, params, good_pix = None, solid_known = None):
         if alg == 'ERA':
             solid_ret, info = ERA(I, iters, support, params, \
                                   mask = good_pix, O = solid_ret, \
-                                  background = None, method = 1, hardware = params['phasing']['hardware'], \
+                                  background = background, method = 1, hardware = params['phasing']['hardware'], \
                                   alpha = 1.0e-10, dtype = 'double', full_output = True)
             eMod += info['eMod']
+            if 'background' in info.keys():
+                background = info['background']
         
         if alg == 'DM':
             solid_ret, info = DM(I, iters, support, params, \
                                   mask = good_pix, O = solid_ret, \
-                                  background = None, method = 1, hardware = 'cpu', \
+                                  background = background, method = 1, hardware = params['phasing']['hardware'], \
                                   alpha = 1.0e-10, dtype = 'double', full_output = True)
             eMod += info['eMod']
+            if 'background' in info.keys():
+                background = info['background']
+
     d1 = time.time()
     print '\n\nTime (s):', d1 - d0
     
