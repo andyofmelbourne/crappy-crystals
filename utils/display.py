@@ -85,13 +85,13 @@ def make_crystal(fnam):
 
     modes = sym_ops_obj.solid_syms_Fourier(Solid_unit)
     
-    N   = config['disorder']['n']
-    exp = disorder.make_exp(config['disorder']['sigma'], config['detector']['shape'])
+    #N   = config['disorder']['n']
+    #exp = disorder.make_exp(config['disorder']['sigma'], config['detector']['shape'])
     
     lattice = sym_ops.lattice(config['crystal']['unit_cell'], config['detector']['shape'])
     
-    diff  = N * exp * np.abs(lattice * np.sum(modes, axis=0)**2)
-    diff += (1. - exp) * np.sum(np.abs(modes)**2, axis=0)
+    #diff  = N * exp * np.abs(lattice * np.sum(modes, axis=0)**2)
+    #diff += (1. - exp) * np.sum(np.abs(modes)**2, axis=0)
 
 
     fourier_space_crystal = np.sum(modes, axis=0) * lattice
@@ -107,7 +107,7 @@ def show_crystal(fnam):
 
 
 class Iso_surface():
-    def __init__(self, data, lvl = 0.6):
+    def __init__(self, data, lvl = 0.4):
         from pyqtgraph.Qt import QtCore, QtGui
         import pyqtgraph as pg
         import pyqtgraph.opengl as gl

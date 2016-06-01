@@ -90,6 +90,13 @@ if __name__ == "__main__":
                          os.path.join(params['output']['path'],'input.h5 &')
         print '\n',runstr
         subprocess.call([runstr], shell=True)
+
+        # crystal
+        display_fnam  = os.path.join(script_dir, 'utils/display.py')
+        runstr = "python " + display_fnam + " " + \
+                         os.path.join(params['output']['path'],'output.h5 -i &')
+        print '\n',runstr
+        subprocess.call([runstr], shell=True)
         
         # output
         display_fnam  = os.path.join(script_dir, 'utils/display.py')

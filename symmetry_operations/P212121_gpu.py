@@ -43,7 +43,7 @@ class P212121():
     
     def solid_syms_Fourier(self, solid_cpu):
         # x = x
-        solid = ap.array(solid)
+        solid = ap.array(solid_cpu)
         self.syms[0] = solid
         # x = 0.5 + x, 0.5 - y, -z
         self.syms[1][:, 0, :]   = solid[:, 0, :]
