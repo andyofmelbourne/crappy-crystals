@@ -107,7 +107,7 @@ def show_crystal(fnam):
 
 
 class Iso_surface():
-    def __init__(self, data, lvl = 0.4):
+    def __init__(self, data, lvl = 0.1):
         from pyqtgraph.Qt import QtCore, QtGui
         import pyqtgraph as pg
         import pyqtgraph.opengl as gl

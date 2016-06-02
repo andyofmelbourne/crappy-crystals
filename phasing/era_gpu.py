@@ -66,6 +66,9 @@ def ERA(I, iters, support, params, mask = 1, O = None, background = None, method
         dtype   = np.float64
         c_dtype = np.complex128
 
+    if O is None :
+        O  = (np.random.random((I.shape)) + 0J).astype(c_dtype)
+
     # support proj
     if type(support) is int :
         S = era.choose_N_highest_pixels( (O * O.conj()).real, support)
@@ -74,12 +77,10 @@ def ERA(I, iters, support, params, mask = 1, O = None, background = None, method
         support = ap.array(support)
         S = support
     
-    if O is None :
-        O  = (np.random.random((I.shape)) + 0J).astype(c_dtype)
-        O = O * S
     
     O    = O.astype(c_dtype)
     O    = ap.array(O)
+    O   *= S
     
     I_norm    = ap.sum(mask * I)
     amp       = ap.array(np.sqrt(I.astype(dtype)))
@@ -142,7 +143,7 @@ def ERA(I, iters, support, params, mask = 1, O = None, background = None, method
             
             eMods.append(eMod)
             eCons.append(eCon)
-        
+
         if full_output : 
             info = {}
             info['I']    = np.array(Imap(ap.fft.fftn(O)))

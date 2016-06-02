@@ -23,6 +23,9 @@ def DM(I, iters, support, params, mask = 1, O = None, background = None, method 
         dtype   = np.float64
         c_dtype = np.complex128
 
+    if O is None :
+        O  = (np.random.random((I.shape)) + 0J).astype(c_dtype)
+
     # support proj
     if type(support) is int :
         S = era.choose_N_highest_pixels( (O * O.conj()).real, support)
@@ -31,12 +34,9 @@ def DM(I, iters, support, params, mask = 1, O = None, background = None, method 
         support = ap.array(support)
         S = support
     
-    if O is None :
-        O  = (np.random.random((I.shape)) + 0J).astype(c_dtype)
-        O = O * S
-
     O    = O.astype(c_dtype)
     O    = ap.array(O)
+    O   *= S
     O0   = O.copy()
     
     I_norm    = ap.array(np.sum(mask * I))
@@ -77,9 +77,9 @@ def DM(I, iters, support, params, mask = 1, O = None, background = None, method 
             # support projection 
             if type(support) is int :
                 S = era.choose_N_highest_pixels( np.array((O * O.conj()).real), support)
+                S = ap.array(S)
             else :
                 S = support
-                S = ap.array(S)
             O0 = O * S
 
             if background is not None :
