@@ -122,7 +122,7 @@ def ERA(I, iters, support, params, mask = 1, O = None, background = None, method
             
             # support projection 
             if type(support) is int :
-                S = era.choose_N_highest_pixels( np.array((O * O.conj()).real), support)
+                S = era.choose_N_highest_pixels( np.array((O * O.conj()).real), support, params['crystal']['unit_cell'])
                 S = ap.array(S)
             else :
                 S = support

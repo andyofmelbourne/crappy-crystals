@@ -28,7 +28,7 @@ def DM(I, iters, support, params, mask = 1, O = None, background = None, method 
         O  = np.random.random((I.shape)).astype(c_dtype)
         # support proj
         if type(support) is int :
-            S = era.choose_N_highest_pixels( (O * O.conj()).real, support)
+            S = era.choose_N_highest_pixels( (O * O.conj()).real, support, params['crystal']['unit_cell'])
         else :
             S = support
         O = O * S
@@ -71,7 +71,7 @@ def DM(I, iters, support, params, mask = 1, O = None, background = None, method 
             
             # support projection 
             if type(support) is int :
-                S = era.choose_N_highest_pixels( (O * O.conj()).real, support)
+                S = era.choose_N_highest_pixels( (O * O.conj()).real, support, params['crystal']['unit_cell'])
             else :
                 S = support
             O0 = O * S

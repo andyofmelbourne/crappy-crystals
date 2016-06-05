@@ -113,7 +113,7 @@ def ERA(I, iters, support, params, mask = 1, O = None, background = None, method
             
             # support projection 
             if type(support) is int :
-                S = choose_N_highest_pixels( (O * O.conj()).real, support)
+                S = choose_N_highest_pixels( (O * O.conj()).real, support, params['crystal']['unit_cell'])
             else :
                 S = support
             O = O * S
@@ -157,10 +157,57 @@ def model_error(amp, O, Imap, mask, background = None):
     err = np.sum( mask * (M - amp)**2 ) 
     return err
 
-def choose_N_highest_pixels(array, N):
+def crop_fftwise(a, shape):
+    """
+    crop a keeping the lowest frequencies:
+    e.g.
+    crop_fftwise([0,1,2,-3,-2,-1], (3,)) = [0, 1, -1]
+    """
+    out = None
+    for axis, s in enumerate(shape):
+        i  = np.fft.fftfreq(a.shape[axis], 1./a.shape[axis]).astype(np.int)
+        io = np.fft.fftfreq(s, 1./s).astype(np.int)
+        
+        index       = [slice(None)]*len(shape)
+        if s < a.shape[axis] :
+            index[axis] = i[io]
+            if out is None :
+                out = a[index]
+            else :
+                out = out[index]
+        else :
+            index[axis] = io[i]
+            
+            if out is None :
+                shape_out       = list(a.shape)
+                shape_out[axis] = s
+                out = np.zeros(shape_out, dtype=a.dtype)
+                out[index] = a
+            else :
+                shape_out       = list(out.shape)
+                shape_out[axis] = s
+                out_t = np.zeros(shape_out, dtype=a.dtype)
+                out_t[index] = out
+                out = out_t
+    return out
+
+
+def choose_N_highest_pixels(arrayin, N, unit_cell=None):
+    """
+    If unit_cell is a 3 element list then only include 
+    voxels in the unit cell volume. 
+    """
+    if unit_cell is not None :
+        array = crop_fftwise(arrayin, unit_cell)
+    else : 
+        array = arrayin
+    
     percent = (1. - float(N) / float(array.size)) * 100.
     thresh  = np.percentile(array, percent)
     support = array > thresh
+    
+    if unit_cell is not None :
+        support = crop_fftwise(support, arrayin.shape)
     # print '\n\nchoose_N_highest_pixels'
     # print 'percentile         :', percent, '%'
     # print 'intensity threshold:', thresh

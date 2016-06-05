@@ -39,25 +39,22 @@ class P212121():
     def solid_syms_Fourier(self, solid):
         # x = x
         self.syms[0] = solid
+        
         # x = 0.5 + x, 0.5 - y, -z
-        self.syms[1][:, 0, :]   = solid[:, 0, :]
-        #self.syms[1][:, :, 0]   = solid[:, :, 0]
-        #self.syms[1][:, 1:, 1:] = solid[:, -1:0:-1, -1:0:-1]
-        self.syms[1][:, 1:, :] =     solid[:, -1:0:-1, :]
+        self.syms[1][:, 0, :]  = solid[:, 0, :]
+        self.syms[1][:, 1:, :] = solid[:, -1:0:-1, :]
         self.syms[1][:, :, 1:] = self.syms[1][:, :, -1:0:-1]
+        
         # x = -x, 0.5 + y, 0.5 - z
-        self.syms[2][0, :, :]   = solid[0, :, :]
-        #self.syms[2][:, :, 0]   = solid[:, :, 0]
-        #self.syms[2][1:, :, 1:] = solid[-1:0:-1, :, -1:0:-1]
+        self.syms[2][0, :, :]  = solid[0, :, :]
         self.syms[2][1:, :, :] = solid[-1:0:-1, :, :]
         self.syms[2][:, :, 1:] = self.syms[2][:, :, -1:0:-1]
+        
         # x = 0.5 - x, -y, 0.5 + z
-        self.syms[3][0, :, :]   = solid[0, :, :]
-        #self.syms[3][:, 0, :]   = solid[:, 0, :]
-        #self.syms[3][1:, 1:, :] = solid[-1:0:-1, -1:0:-1, :]
+        self.syms[3][0, :, :]  = solid[0, :, :]
         self.syms[3][1:, :, :] = solid[-1:0:-1, :, :]
         self.syms[3][:, 1:, :] = self.syms[3][:, -1:0:-1, :]
-
+        
         self.syms *= self.translations
         return self.syms
 
