@@ -94,14 +94,14 @@ def make_crystal(fnam):
     #diff += (1. - exp) * np.sum(np.abs(modes)**2, axis=0)
 
 
-    fourier_space_crystal = np.sum(modes, axis=0) * lattice
+    fourier_space_crystal = np.sum(modes, axis=0) #* lattice
     real_space_crystal    = np.fft.ifftn(fourier_space_crystal)
     real_space_crystal    = np.fft.fftshift(real_space_crystal)
 
     return real_space_crystal
 
 def show_crystal(fnam):
-    c   = make_crystal(fnam)
+    c   = np.abs(make_crystal(fnam))**2
     c[c.real < 0] = 0
     iso = Iso_surface(np.abs(c.real))
 

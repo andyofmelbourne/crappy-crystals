@@ -89,6 +89,16 @@ def ERA(I, iters, support, params, mask = 1, O = None, background = None, method
     else :
         print 'no background'
     
+    # unit cell mapper for the no overlap support
+    if params['crystal']['space_group'] == 'P1':
+        import crappy_crystals.symmetry_operations.P1 as sym_ops 
+        sym_ops_obj = sym_ops.P1(params['crystal']['unit_cell'], params['crystal']['unit_cell'], dtype)
+    elif params['crystal']['space_group'] == 'P212121':
+        import crappy_crystals.symmetry_operations.P212121 as sym_ops 
+        sym_ops_obj = sym_ops.P212121(params['crystal']['unit_cell'], params['crystal']['unit_cell'], dtype)
+    
+    mapper_unit = sym_ops_obj.solid_syms_real
+
     mapper = maps.Mappings(params)
     Imap   = lambda x : mapper.make_diff(solid = x)
     
@@ -109,11 +119,10 @@ def ERA(I, iters, support, params, mask = 1, O = None, background = None, method
             else :
                 O = pmod(amp, O, Imap, mask, alpha = alpha)
             
-            O1 = O.copy()
-            
             # support projection 
             if type(support) is int :
-                S = choose_N_highest_pixels( (O * O.conj()).real, support, params['crystal']['unit_cell'])
+                S = choose_N_highest_pixels( (O * O.conj()).real, support, \
+                        params['crystal']['unit_cell'], mapper = mapper_unit)
             else :
                 S = support
             O = O * S
@@ -122,8 +131,7 @@ def ERA(I, iters, support, params, mask = 1, O = None, background = None, method
                 background, rs, r_av = radial_symetry(background.copy(), rs = rs)
             
             # metrics
-            O2   = O.copy()
-            eCon = l2norm(O2, O0)
+            eCon = l2norm(O, O0)
             
             eMod  = model_error(amp, O, Imap, mask, background = background)
             eMod  = np.sqrt( eMod / I_norm )
@@ -191,8 +199,7 @@ def crop_fftwise(a, shape):
                 out = out_t
     return out
 
-
-def choose_N_highest_pixels(arrayin, N, unit_cell=None):
+def choose_N_highest_pixels(arrayin, N, unit_cell = None, mapper = None):
     """
     If unit_cell is a 3 element list then only include 
     voxels in the unit cell volume. 
@@ -201,19 +208,30 @@ def choose_N_highest_pixels(arrayin, N, unit_cell=None):
         array = crop_fftwise(arrayin, unit_cell)
     else : 
         array = arrayin
+
+    # no overlap constraint
+    if mapper is not None :
+        syms = mapper(array)
+        # if array is not the maximum value
+        # of the M symmetry related units 
+        # then do not update 
+        update_mask = syms[0] == np.max(syms, axis=0) 
+    else :
+        update_mask = np.ones(array.shape, dtype = np.bool)
     
-    percent = (1. - float(N) / float(array.size)) * 100.
-    thresh  = np.percentile(array, percent)
-    support = array > thresh
+    percent = (1. - float(N) / float(np.sum(update_mask))) * 100.
+    thresh  = np.percentile(array[update_mask], percent)
+    support = update_mask * (array > thresh)
     
     if unit_cell is not None :
         support = crop_fftwise(support, arrayin.shape)
-    # print '\n\nchoose_N_highest_pixels'
-    # print 'percentile         :', percent, '%'
-    # print 'intensity threshold:', thresh
-    # print 'number of pixels in support:', np.sum(support)
+    
+    print '\n\nchoose_N_highest_pixels'
+    print 'percentile         :', percent, '%'
+    print 'intensity threshold:', thresh
+    print 'number of pixels in support:', np.sum(support)
     return support
-        
+
 def radial_symetry(background, rs = None, is_fft_shifted = True):
     if rs is None :
         i = np.fft.fftfreq(background.shape[0]) * background.shape[0]

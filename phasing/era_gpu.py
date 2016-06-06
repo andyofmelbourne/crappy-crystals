@@ -98,6 +98,16 @@ def ERA(I, iters, support, params, mask = 1, O = None, background = None, method
     
     mask = ap.array(mask.astype(np.int))
     
+    # unit cell mapper for the no overlap support
+    if params['crystal']['space_group'] == 'P1':
+        import crappy_crystals.symmetry_operations.P1 as sym_ops 
+        sym_ops_obj = sym_ops.P1(params['crystal']['unit_cell'], params['crystal']['unit_cell'], dtype)
+    elif params['crystal']['space_group'] == 'P212121':
+        import crappy_crystals.symmetry_operations.P212121 as sym_ops 
+        sym_ops_obj = sym_ops.P212121(params['crystal']['unit_cell'], params['crystal']['unit_cell'], dtype)
+
+    mapper_unit = sym_ops_obj.solid_syms_real
+
     mapper = maps.Mappings(params)
     Imap   = lambda x : mapper.make_diff(solid = x)
     
@@ -118,11 +128,10 @@ def ERA(I, iters, support, params, mask = 1, O = None, background = None, method
             else :
                 O = pmod(amp, O, Imap, mask, alpha = alpha)
             
-            O1 = O.copy()
-            
             # support projection 
             if type(support) is int :
-                S = era.choose_N_highest_pixels( np.array((O * O.conj()).real), support, params['crystal']['unit_cell'])
+                S = era.choose_N_highest_pixels( np.array((O * O.conj()).real), support,\
+                            params['crystal']['unit_cell'], mapper = mapper_unit)
                 S = ap.array(S)
             else :
                 S = support
@@ -133,8 +142,7 @@ def ERA(I, iters, support, params, mask = 1, O = None, background = None, method
                 background   = ap.array(bt)
             
             # metrics
-            O2   = O.copy()
-            eCon = l2norm(O2, O0)
+            eCon = l2norm(O, O0)
             
             eMod  = model_error(amp, O, Imap, mask, background = background)
             eMod  = ap.sqrt( eMod / I_norm )

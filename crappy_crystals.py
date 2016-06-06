@@ -22,14 +22,24 @@ def generate_diff(config):
     Solid_unit = np.fft.fftn(solid_unit, config['detector']['shape'])
     solid_unit_expanded = np.fft.ifftn(Solid_unit)
 
+    # define the solid_unit support
+    if config['simulation']['support_frac'] is not None :
+        support = utils.padding.expand_region_by(solid_unit_expanded > 0.1, config['simulation']['support_frac'])
+    else :
+        support = solid_unit_expanded > (solid_unit_expanded.min() + 1.0e-5)
+    
+    solid_unit_expanded = np.random.random(support.shape)*support + 0J
+    Solid_unit = np.fft.fftn(solid_unit_expanded)
+
     modes = sym_ops_obj.solid_syms_Fourier(Solid_unit)
     
     N   = config['simulation']['n']
+    print 'N:', N
     exp = utils.disorder.make_exp(config['simulation']['sigma'], config['detector']['shape'])
     
     lattice = sym_ops.lattice(config['simulation']['unit_cell'], config['detector']['shape'])
     
-    diff  = N * exp * np.abs(lattice * np.sum(modes, axis=0)**2)
+    diff  = N * exp * lattice * np.abs(np.sum(modes, axis=0)**2)
     diff += (1. - exp) * np.sum(np.abs(modes)**2, axis=0)
 
     # add noise
@@ -52,12 +62,7 @@ def generate_diff(config):
     else :
         background = None
 
-    # define the solid_unit support
-    if config['simulation']['support_frac'] is not None :
-        support = utils.padding.expand_region_by(solid_unit_expanded > 0.1, config['simulation']['support_frac'])
-    else :
-        support = solid_unit_expanded > (solid_unit_expanded.min() + 1.0e-5)
-    
+
     # add a beamstop
     if config['simulation']['beamstop'] is not None :
         beamstop = utils.beamstop.make_beamstop(diff.shape, config['simulation']['beamstop'])
