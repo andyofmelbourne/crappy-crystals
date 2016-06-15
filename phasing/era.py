@@ -100,7 +100,7 @@ def ERA(I, iters, support, params, mask = 1, O = None, background = None, method
     mapper_unit = sym_ops_obj.solid_syms_real
 
     mapper = maps.Mappings(params)
-    Imap   = lambda x : mapper.make_diff(solid = x)
+    Imap   = mapper.make_diff
     
     # initial error
     #print '\nInitial error: ', l2norm(np.sqrt(mask*I), np.sqrt(mask*Imap(np.fft.fftn(O))))
@@ -114,15 +114,22 @@ def ERA(I, iters, support, params, mask = 1, O = None, background = None, method
             O0 = O.copy()
             
             # modulus projection 
+            ####################
             if background is not None :
                 O, background  = pmod_back(amp, background, O, Imap, mask, alpha = alpha)
             else :
-                O = pmod(amp, O, Imap, mask, alpha = alpha)
+                O, U = pmod(amp, O, Imap, mask, alpha = alpha)
             
             # support projection 
+            ####################
+            # merge O and U
+            O = mapper.merge_solids_unit_cell(O, U)
+            #
+            # apply volume support
             if type(support) is int :
-                S = choose_N_highest_pixels( (O * O.conj()).real, support, \
-                        params['crystal']['unit_cell'], mapper = mapper_unit)
+                #S = choose_N_highest_pixels( (O * O.conj()).real, support, \
+                #        params['crystal']['unit_cell'], mapper = mapper_unit)
+                S = choose_N_highest_pixels( (O * O.conj()).real, support)
             else :
                 S = support
             O = O * S
@@ -276,15 +283,19 @@ def radial_average_to_array(r_av, shape, is_fft_shifted = True):
 
 def pmod(amp, O, Imap, mask = 1, alpha = 1.0e-10):
     O = np.fft.fftn(O)
-    O = Pmod(amp, O, Imap(O), mask = mask, alpha = alpha)
-    O = np.fft.ifftn(O)
-    return O
+    O, U = Pmod(amp, O, Imap, mask = mask, alpha = alpha)
+    O, U = np.fft.ifftn(O, axes=(1,2,3)), np.fft.ifftn(U)
+    return O, U
     
 def Pmod(amp, O, Imap, mask = 1, alpha = 1.0e-10):
-    M    = mask * amp / np.sqrt(Imap + alpha)
-    out  = O * M
-    out += (1 - mask) * O
-    return out
+    I, O, U = Imap(O, return_DandB = True)
+    M     = mask * amp / np.sqrt(I + alpha)
+    Oout  = O * M
+    Oout += (1 - mask) * O
+    #
+    Uout  = U * M
+    Uout += (1 - mask) * U
+    return Oout, Uout
 
 def pmod_back(amp, background, O, Imap, mask = 1, alpha = 1.0e-10):
     O = np.fft.fftn(O)

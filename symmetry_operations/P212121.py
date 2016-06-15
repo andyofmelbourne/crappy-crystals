@@ -104,7 +104,7 @@ class P212121():
         
         for i, t in enumerate(translations):
             syms[i+1] = multiroll(syms[i+1], t)
-        return syms
+        return syms.copy()
 
 
 def test_P212121():

@@ -28,7 +28,8 @@ def generate_diff(config):
     else :
         support = solid_unit_expanded > (solid_unit_expanded.min() + 1.0e-5)
     
-    solid_unit_expanded = np.random.random(support.shape)*support + 0J
+    #solid_unit_expanded = np.random.random(support.shape)*support + 0J
+    solid_unit_expanded = solid_unit_expanded * support 
     Solid_unit = np.fft.fftn(solid_unit_expanded)
 
     modes = sym_ops_obj.solid_syms_Fourier(Solid_unit)
