@@ -228,13 +228,19 @@ class Application():
 
         if 'modulus_error' in kwargs.keys():
             emod = kwargs['modulus_error']
-            self.plot_emod.plot(emod)
+            if len(emod.shape) == 1 :
+                self.plot_emod.plot(emod)
+            else :
+                for e in emod :
+                    self.plot_emod.plot(e)
             self.plot_emod.setTitle('Modulus error l2norm:')
         
+        """
         if 'fidelity_error' in kwargs.keys():
             efid = kwargs['fidelity_error']
             self.plot_efid.plot(efid)
             self.plot_efid.setTitle('Fidelity error l2norm:')
+        """
         
         ## Display the widget as a new window
         w.show()
