@@ -1,6 +1,6 @@
 import numpy as np
 import crappy_crystals.solid_units 
-import crappy_crystals.symmetry_operations as symmetry_operations 
+import crappy_crystals.phasing.symmetry_operations as symmetry_operations 
 import disorder
 
 
@@ -8,11 +8,9 @@ def generate_diff(config):
     solid_unit = crappy_crystals.solid_units.duck_3D.make_3D_duck(shape = config['simulation']['shape'])
     
     if config['simulation']['space_group'] == 'P1':
-        sym_ops = symmetry_operations.P1 
-        sym_ops_obj = sym_ops.P1(config['simulation']['unit_cell'], config['detector']['shape'])
+        sym_ops = symmetry_operations.P1(config['simulation']['unit_cell'], config['detector']['shape'])
     elif config['simulation']['space_group'] == 'P212121':
-        sym_ops = symmetry_operations.P212121
-        sym_ops_obj = sym_ops.P212121(config['simulation']['unit_cell'], config['detector']['shape'])
+        sym_ops = symmetry_operations.P212121(config['simulation']['unit_cell'], config['detector']['shape'])
     
     Solid_unit = np.fft.fftn(solid_unit, config['detector']['shape'])
     solid_unit_expanded = np.fft.ifftn(Solid_unit)
@@ -27,12 +25,12 @@ def generate_diff(config):
     solid_unit_expanded = solid_unit_expanded * support 
     Solid_unit = np.fft.fftn(solid_unit_expanded)
 
-    modes = sym_ops_obj.solid_syms_Fourier(Solid_unit)
+    modes = sym_ops.solid_syms_Fourier(Solid_unit)
     
     N   = config['simulation']['n']
     exp = disorder.make_exp(config['simulation']['sigma'], config['detector']['shape'])
     
-    lattice = sym_ops.lattice(config['simulation']['unit_cell'], config['detector']['shape'])
+    lattice = symmetry_operations.lattice(config['simulation']['unit_cell'], config['detector']['shape'])
     
     diff  = N * exp * lattice * np.abs(np.sum(modes, axis=0)**2)
     diff += (1. - exp) * np.sum(np.abs(modes)**2, axis=0)
