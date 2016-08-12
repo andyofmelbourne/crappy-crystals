@@ -94,7 +94,7 @@ def make_crystal(fnam):
     #diff += (1. - exp) * np.sum(np.abs(modes)**2, axis=0)
 
 
-    fourier_space_crystal = np.sum(modes, axis=0) #* lattice
+    fourier_space_crystal = np.sum(modes, axis=0) * lattice
     real_space_crystal    = np.fft.ifftn(fourier_space_crystal)
     real_space_crystal    = np.fft.fftshift(real_space_crystal)
 
@@ -172,7 +172,7 @@ class Application():
         elif 'solid_unit' in kwargs.keys():
             solid_unit_ret = kwargs['solid_unit']
         
-        solid_unit_ret = np.fft.ifftshift(solid_unit_ret.real)
+        solid_unit_ret = solid_unit_ret.real
         duck_plots = (np.sum(solid_unit_ret, axis=0),\
                       np.sum(solid_unit_ret, axis=1),\
                       np.sum(solid_unit_ret, axis=2))

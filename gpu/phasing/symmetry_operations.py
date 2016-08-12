@@ -32,7 +32,7 @@ class P1():
         # keep an array for the 1 symmetry related coppies of the solid unit
         self.syms = afnumpy.zeros((1,) + tuple(det_shape), dtype=dtype)
     
-    def solid_syms_Fourier(self, solid):
+    def solid_syms_Fourier(self, solid, apply_translation = True):
         """
         Take the Fourier space solid unit then return each
         of the symmetry related partners.
@@ -48,6 +48,10 @@ class P1():
         self.syms[0] = solid
         return self.syms
 
+    def unflip_modes_Fourier(self, U, apply_translation = True):
+        out = afnumpy.empty_like(U)
+        out[0] = U[0]
+        return out
 
 class P212121():
     """
@@ -90,7 +94,7 @@ class P212121():
         T3 = T_fourier(det_shape, [unitcell_size[0]/2., 0.0, unitcell_size[2]/2.])
         self.translations = afnumpy.array([T0, T1, T2, T3])
     
-    def solid_syms_Fourier(self, solid):
+    def solid_syms_Fourier(self, solid, apply_translation = True):
         # x = 0.5 + x, 0.5 - y, -z
         u1 = afnumpy.arrayfire.data.flip(solid.d_array, dim=1)
         u1 = afnumpy.arrayfire.data.flip(u1, dim=0)
@@ -110,13 +114,40 @@ class P212121():
         U = afnumpy.arrayfire.data.moddims(U, self.syms.shape[3],self.syms.shape[2],self.syms.shape[1],self.syms.shape[0])
         self.syms = afnumpy.asarray(U)
         
-        if self.translations is None :
-            self.make_Ts()
-        
-        self.syms *= self.translations
-        #return np.array([np.array(afnumpy.array(i)) for i in [solid, u1, u2, u3]]) # afnumpy.array(U) #self.syms
-        #return afnumpy.array(U) * self.translations #self.syms
+        if apply_translation :
+            if self.translations is None :
+                self.make_Ts()
+            
+            self.syms *= self.translations
         return self.syms
+
+    def unflip_modes_Fourier(self, U, apply_translation = True):
+        # x = 0.5 + x, 0.5 - y, -z
+        u1 = afnumpy.arrayfire.data.flip(U[1].d_array, dim=1)
+        u1 = afnumpy.arrayfire.data.flip(u1, dim=0)
+        u1 = afnumpy.arrayfire.data.shift(u1, 1, d1=1)
+
+        # x = -x, 0.5 + y, 0.5 - z
+        u2 = afnumpy.arrayfire.data.flip(U[2].d_array, dim=2)
+        u2 = afnumpy.arrayfire.data.flip(u2, dim=0)
+        u2 = afnumpy.arrayfire.data.shift(u2, 1, d2=1)
+
+        # x = 0.5 - x, -y, 0.5 + z
+        u3 = afnumpy.arrayfire.data.flip(U[3].d_array, dim=2)
+        u3 = afnumpy.arrayfire.data.flip(u3, dim=1)
+        u3 = afnumpy.arrayfire.data.shift(u3, 0, d1=1, d2=1)
+
+        U_inv = afnumpy.arrayfire.data.join(3, U[0].d_array, u1, u2, u3)
+        U_inv = afnumpy.arrayfire.data.moddims(U_inv, self.syms.shape[3],self.syms.shape[2],self.syms.shape[1],self.syms.shape[0])
+        U_inv = afnumpy.asarray(U_inv)
+        
+
+        if apply_translation :
+            if self.translations is None :
+                self.make_Ts()
+            
+            U_inv *= self.translations.conj()
+        return U_inv
 
     def solid_syms_real(self, solid):
         """

@@ -263,7 +263,147 @@ def test_P1():
 
     print('arrayfire == np ?:', np.allclose(temp1, np.array(temp)))
 
+def test_P1_unflips():
+    # test mode inversion
+    print('\n\n')
+    print('Testing --> modes --> object:')
+    a = np.arange(4**3).reshape((4,4,4)) + 0J
+
+    sym_ops = crappy_crystals.phasing.symmetry_operations.P1(a.shape, a.shape, a.dtype)
+    U = sym_ops.solid_syms_Fourier(a)
+
+    U_inv = sym_ops.unflip_modes_Fourier(U)
+
+    print('solid == unflipped modes? (for all modes):')
+    [print(np.allclose(a, m)) for m in U_inv]
+
+    print('solid == average unflipped modes?:')
+    print(np.allclose(a, np.mean(U_inv, axis=0)))
+
+    print('\n')
+    print('gpu:')
+    sym_ops_gpu = crappy_crystals.gpu.phasing.symmetry_operations.P1(a.shape, a.shape, a.dtype)
+    U_gpu = sym_ops_gpu.solid_syms_Fourier(afnumpy.array(a))
+
+    U_inv = sym_ops.unflip_modes_Fourier(U_gpu)
+
+    print('solid == unflipped modes? (for all modes):')
+    [print(np.allclose(a, np.array(m))) for m in U_inv]
+
+    print('solid == average unflipped modes?:')
+    print(np.allclose(a, np.array(afnumpy.mean(U_inv, axis=0))))
+
+def test_P212121_unflips():
+    # test mode inversion
+    print('\n\n')
+    print('Testing --> modes --> object:')
+    a = np.arange(4**3).reshape((4,4,4)) + 0J
+
+    #sym_ops = crappy_crystals.phasing.symmetry_operations.P212121(a.shape, a.shape, a.dtype)
+    sym_ops = crappy_crystals.phasing.symmetry_operations.P212121( \
+            (a.shape[0]//2, a.shape[1]//2, a.shape[2]//2), a.shape, a.dtype)
+    U = sym_ops.solid_syms_Fourier(a)
+
+    U_inv = sym_ops.unflip_modes_Fourier(U)
+
+    print('solid == unflipped modes? (for all modes):')
+    [print(np.allclose(a, m)) for m in U_inv]
+
+    print('solid == average unflipped modes?:')
+    print(np.allclose(a, np.mean(U_inv, axis=0)))
+
+    print('modes == broadcast average unflipped modes?:')
+    print(np.allclose(U, sym_ops.solid_syms_Fourier(np.mean(U_inv, axis=0))))
+
+    print('\n')
+    print('gpu:')
+    sym_ops_gpu = crappy_crystals.gpu.phasing.symmetry_operations.P212121(a.shape, a.shape, a.dtype)
+    U_gpu = sym_ops_gpu.solid_syms_Fourier(afnumpy.array(a))
+
+    U_inv = sym_ops.unflip_modes_Fourier(U_gpu)
+
+    print('solid == unflipped modes? (for all modes):')
+    [print(np.allclose(a, np.array(m))) for m in U_inv]
+
+    print('solid == average unflipped modes?:')
+    print(np.allclose(a, np.array(afnumpy.mean(U_inv, axis=0))))
+
+
+def test_P212121_Psup():
+    # test mode inversion
+    print('\n\n')
+    print('Testing --> modes --> object:')
+    shape = (32,32,32)
+    a = np.random.random(shape) + 1J * np.random.random(shape)
+
+    #sym_ops = crappy_crystals.phasing.symmetry_operations.P212121(a.shape, a.shape, a.dtype)
+    sym_ops = crappy_crystals.phasing.symmetry_operations.P212121( \
+            (a.shape[0]//2, a.shape[1]//2, a.shape[2]//2), a.shape, a.dtype)
+
+    modes = np.zeros( (2 * sym_ops.syms.shape[0],) + sym_ops.syms.shape[1:], a.dtype)
+    # diffuse terms
+    modes[:modes.shape[0]//2] = sym_ops.solid_syms_Fourier(a, apply_translation = False)
+    # unit cell terms
+    modes[modes.shape[0]//2:] = sym_ops.solid_syms_Fourier(a, apply_translation = True)
+
+    out = np.empty_like(modes)
+
+    # diffuse terms: unflip the modes
+    out[: out.shape[0]//2] = \
+            sym_ops.unflip_modes_Fourier(modes[: modes.shape[0]//2], apply_translation = False)
+
+    # unit_cell terms: unflip the modes
+    out[modes.shape[0]//2 :] = \
+            sym_ops.unflip_modes_Fourier(modes[modes.shape[0]//2 :], apply_translation = True)
+
+    # average 
+    out = np.mean(out, axis=0)
+
+    print('solid == average unflipped modes?:')
+    print(np.allclose(a, out))
+
+    print('modes == broadcast average unflipped modes?:')
+    modes_out = np.empty_like(modes)
+    modes_out[: modes_out.shape[0]//2] = sym_ops.solid_syms_Fourier(out, apply_translation=False)
+    modes_out[modes_out.shape[0]//2 :] = sym_ops.solid_syms_Fourier(out, apply_translation=True)
+
+    print(np.allclose(modes, modes_out))
+
+def test_real_Fourier_syms():
+    # test mode inversion
+    print('\n\n')
+    print('Testing Fourier solid --> modes == Real solid --> modes ')
+    shape = (32,32,32)
+    aR = np.random.random(shape) + 1J * np.random.random(shape)
+
+    a = np.fft.fftn(aR)
+    
+    #sym_ops = crappy_crystals.phasing.symmetry_operations.P212121(a.shape, a.shape, a.dtype)
+    sym_ops = crappy_crystals.phasing.symmetry_operations.P212121( \
+            (a.shape[0]//2, a.shape[1]//2, a.shape[2]//2), a.shape, a.dtype)
+
+    # unit cell terms
+    symsF = sym_ops.solid_syms_Fourier(a, apply_translation = True)
+
+    a = aR
+    
+    #sym_ops = crappy_crystals.phasing.symmetry_operations.P212121(a.shape, a.shape, a.dtype)
+    sym_ops = crappy_crystals.phasing.symmetry_operations.P212121( \
+            (a.shape[0]//2, a.shape[1]//2, a.shape[2]//2), a.shape, a.dtype)
+
+    # unit cell terms
+    symsR = sym_ops.solid_syms_real(a)
+
+    symsR = np.fft.fftn(symsR, axes=(1,2,3))
+
+    print('F{symsR} == symsF ?:', np.allclose(symsR, symsF))
+
+
+
 if __name__ == '__main__':
     """
     """
-    test_P1()
+    #test_P212121_unflips()
+    #test_P212121_Psup()
+    test_real_Fourier_syms()
+

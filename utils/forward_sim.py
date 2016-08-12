@@ -6,6 +6,7 @@ import disorder
 
 def generate_diff(config):
     solid_unit = crappy_crystals.solid_units.duck_3D.make_3D_duck(shape = config['simulation']['shape'])
+    #solid_unit *= np.random.random(solid_unit.shape)
     
     if config['simulation']['space_group'] == 'P1':
         sym_ops = symmetry_operations.P1(config['simulation']['unit_cell'], config['detector']['shape'])

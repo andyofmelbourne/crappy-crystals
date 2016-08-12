@@ -1,3 +1,8 @@
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+
 import numpy as np
 from itertools import product
 
@@ -29,7 +34,7 @@ class P1():
         # keep an array for the 1 symmetry related coppies of the solid unit
         self.syms = np.zeros((1,) + tuple(det_shape), dtype=dtype)
     
-    def solid_syms_Fourier(self, solid):
+    def solid_syms_Fourier(self, solid, apply_translation = True):
         """
         Take the Fourier space solid unit then return each
         of the symmetry related partners.
@@ -44,6 +49,11 @@ class P1():
         # x = x
         self.syms[0] = solid
         return self.syms
+
+    def unflip_modes_Fourier(self, U, apply_translation = True):
+        out = np.empty_like(U)
+        out[0] = U[0]
+        return out
 
 class P212121():
     """
@@ -86,7 +96,7 @@ class P212121():
         T3 = T_fourier(det_shape, [unitcell_size[0]/2., 0.0, unitcell_size[2]/2.])
         self.translations = np.array([T0, T1, T2, T3])
     
-    def solid_syms_Fourier(self, solid):
+    def solid_syms_Fourier(self, solid, apply_translation = True):
         self.syms = self.syms.astype(solid.dtype)
         
         # x = x
@@ -107,11 +117,41 @@ class P212121():
         self.syms[3][1:, :, :] = solid[-1:0:-1, :, :]
         self.syms[3][:, 1:, :] = self.syms[3][:, -1:0:-1, :]
         
-        if self.translations is None :
-            self.make_Ts()
-        
-        self.syms *= self.translations
+        if apply_translation :
+            if self.translations is None :
+                self.make_Ts()
+            
+            self.syms *= self.translations
         return self.syms
+
+    def unflip_modes_Fourier(self, U, apply_translation=True):
+        U_inv = U.copy()
+        
+        if apply_translation :
+            if self.translations is None :
+                self.make_Ts()
+            
+            U_inv *= self.translations.conj()
+        
+        # x = x
+        U_inv[0] = U_inv[0]
+        
+        # x = 0.5 + x, 0.5 - y, -z
+        U_inv[1][:, 0, :]  = U_inv[1][:, 0, :]
+        U_inv[1][:, 1:, :] = U_inv[1][:, -1:0:-1, :]
+        U_inv[1][:, :, 1:] = U_inv[1][:, :, -1:0:-1]
+
+        # x = -x, 0.5 + y, 0.5 - z
+        U_inv[2][0, :, :]  = U_inv[2][0, :, :]
+        U_inv[2][1:, :, :] = U_inv[2][-1:0:-1, :, :]
+        U_inv[2][:, :, 1:] = U_inv[2][:, :, -1:0:-1]
+        
+        # x = 0.5 - x, -y, 0.5 + z
+        U_inv[3][0, :, :]  = U_inv[3][0, :, :]
+        U_inv[3][1:, :, :] = U_inv[3][-1:0:-1, :, :]
+        U_inv[3][:, 1:, :] = U_inv[3][:, -1:0:-1, :]
+
+        return U_inv
 
     def solid_syms_real(self, solid):
         """
@@ -139,9 +179,9 @@ class P212121():
         syms[3][:, 1:, :] = syms[3][:, -1:0:-1, :]
         
         translations = []
-        translations.append([self.unitcell_size[0]/2, self.unitcell_size[1]/2, 0])
-        translations.append([0, self.unitcell_size[1]/2, self.unitcell_size[2]/2])
-        translations.append([self.unitcell_size[0]/2, 0, self.unitcell_size[2]/2])
+        translations.append([self.unitcell_size[0]//2, self.unitcell_size[1]//2, 0])
+        translations.append([0, self.unitcell_size[1]//2, self.unitcell_size[2]//2])
+        translations.append([self.unitcell_size[0]//2, 0, self.unitcell_size[2]//2])
         
         for i, t in enumerate(translations):
             syms[i+1] = multiroll(syms[i+1], t)
@@ -183,30 +223,30 @@ def test_P212121():
     """
 
     # test symmetries
-    u2 = np.array(unit_cell_size) / 2
+    u2 = np.array(unit_cell_size) // 2
     i1 = i
     j1 = j
     k1 = k
-    print 'r1 = x, y, z             :', \
-            np.allclose(unit_cell[i,j,k], unit_cell[i1,j1,k1])
+    print('r1 = x, y, z             :', \
+            np.allclose(unit_cell[i,j,k], unit_cell[i1,j1,k1]))
 
     i2 =  ((i + u2[0] + u2[0]) % unit_cell_size[0]) - u2[0]
     j2 = ((-j + u2[1] + u2[1]) % unit_cell_size[1]) - u2[1] 
     k2 = -k
-    print 'r2 = 1/2 + x, 1/2 - y, -z:', \
-            np.allclose(unit_cell[i,j,k], unit_cell[i2,j2,k2])
+    print('r2 = 1/2 + x, 1/2 - y, -z:', \
+            np.allclose(unit_cell[i,j,k], unit_cell[i2,j2,k2]))
 
     i3 =  -i
     j3 = ((j + u2[1] + u2[1]) % unit_cell_size[1]) - u2[1] 
     k3 = ((-k + u2[2] + u2[2]) % unit_cell_size[2]) - u2[2] 
-    print 'r3 = -x, 1/2 + y, 1/2 - z:', \
-            np.allclose(unit_cell[i,j,k], unit_cell[i3,j3,k3])
+    print('r3 = -x, 1/2 + y, 1/2 - z:', \
+            np.allclose(unit_cell[i,j,k], unit_cell[i3,j3,k3]))
 
     i4 = ((-i + u2[0] + u2[0]) % unit_cell_size[0]) - u2[0] 
     j4 = -j
     k4 = ((k + u2[2] + u2[2]) % unit_cell_size[2]) - u2[2] 
-    print 'r3 = 1/2 - x, -y, 1/2 + z:', \
-            np.allclose(unit_cell[i,j,k], unit_cell[i4,j4,k4])
+    print('r3 = 1/2 - x, -y, 1/2 + z:', \
+            np.allclose(unit_cell[i,j,k], unit_cell[i4,j4,k4]))
 
 def T_fourier(shape, T, is_fft_shifted = True):
     """
