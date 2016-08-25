@@ -5,20 +5,22 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import numpy as np
-import sys
-import os
-try :
-    import ConfigParser as configparser
-except :
-    import configparser
-
+import ConfigParser
 import time
 import re
 
+import phasing_3d
+
+# insert the directory in which this file is being executed from
+# into sys.path
+import os, sys
+sys.path.append(os.path.abspath(__file__)[:-len(__file__)])
+
 import crappy_crystals
 from crappy_crystals import utils
-from crappy_crystals.phasing.era import ERA
-from crappy_crystals.phasing.dm import DM
+from crappy_crystals.gpu.phasing.maps import Mapper_naive as Mapper_naive_gpu 
+from crappy_crystals.phasing.maps import Mapper_naive, Mapper_ellipse
+
 
 def config_iters_to_alg_num(string):
     # split a string like '100ERA 200DM 50ERA' with the numbers

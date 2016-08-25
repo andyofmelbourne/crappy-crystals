@@ -10,10 +10,15 @@ import pyqtgraph as pg
 import pyqtgraph.opengl as gl
 import numpy as np
 import signal
-import sys
 
-from crappy_crystals.utils.io_utils import read_input_output_h5
-#from .io_utils import read_input_output_h5
+from io_utils import read_input_output_h5
+
+# insert the directory in which this file is being executed from
+# into sys.path
+import os, sys
+sys.path.append(os.path.abspath(__file__)[:-len(__file__)])
+
+import crappy_crystals.phasing.symmetry_operations as symmetry_operations 
 
 def show_vol(map_3d):
     signal.signal(signal.SIGINT, signal.SIG_DFL)    # allow Control-C
