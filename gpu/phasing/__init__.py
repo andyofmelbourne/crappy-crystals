@@ -1,1 +1,0 @@
-import symmetry_operations

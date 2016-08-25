@@ -1,2 +1,9 @@
-import maps
-import symmetry_operations
+# python 2/3 compatibility
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+
+from . import maps
+from . import era
+from . import dm

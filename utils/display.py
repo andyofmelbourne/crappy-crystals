@@ -1,3 +1,9 @@
+# python 2/3 compatibility
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+
 import pyqtgraph as pg
 from PyQt4 import QtGui, QtCore
 import pyqtgraph as pg
@@ -6,8 +12,8 @@ import numpy as np
 import signal
 import sys
 
-from io_utils import read_input_output_h5
-import crappy_crystals.phasing.symmetry_operations as symmetry_operations 
+from crappy_crystals.utils.io_utils import read_input_output_h5
+#from .io_utils import read_input_output_h5
 
 def show_vol(map_3d):
     signal.signal(signal.SIGINT, signal.SIG_DFL)    # allow Control-C
@@ -65,20 +71,20 @@ def make_crystal(fnam):
     config = kwargs['config_file']
     
     if 'solid_unit_retrieved' in kwargs.keys():
-        print '\nsolid_unit = solid_unit_retrieved'
+        print('\nsolid_unit = solid_unit_retrieved')
         solid_unit = kwargs['solid_unit_retrieved']
     elif 'solid_unit_init' in kwargs.keys():
-        print '\nsolid_unit = solid_unit_init'
+        print('\nsolid_unit = solid_unit_init')
         solid_unit = kwargs['solid_unit_init']
     elif 'solid_unit' in kwargs.keys():
-        print '\nsolid_unit = solid_unit'
+        print('\nsolid_unit = solid_unit')
         solid_unit = kwargs['solid_unit']
     
     if config['crystal']['space_group'] == 'P1':
-        sym_ops = symmetry_operations 
+        sym_ops = symmetry_operations.P1 
         sym_ops_obj = sym_ops.P1(config['crystal']['unit_cell'], config['detector']['shape'])
     elif config['crystal']['space_group'] == 'P212121':
-        sym_ops = symmetry_operations
+        sym_ops = symmetry_operations.P212121 
         sym_ops_obj = sym_ops.P212121(config['crystal']['unit_cell'], config['detector']['shape'])
     
     Solid_unit = np.fft.fftn(solid_unit, config['detector']['shape'])
@@ -95,7 +101,7 @@ def make_crystal(fnam):
     #diff += (1. - exp) * np.sum(np.abs(modes)**2, axis=0)
 
 
-    fourier_space_crystal = np.sum(modes, axis=0) * lattice
+    fourier_space_crystal = np.sum(modes, axis=0) #* lattice
     real_space_crystal    = np.fft.ifftn(fourier_space_crystal)
     real_space_crystal    = np.fft.fftshift(real_space_crystal)
 
@@ -164,8 +170,7 @@ class Iso_surface():
 
 class Application():
 
-    def __init__(self, fnam, **kwargs):
-        real_space_crystal = make_crystal(fnam)
+    def __init__(self, **kwargs):
         
         if 'solid_unit_retrieved' in kwargs.keys():
             solid_unit_ret = kwargs['solid_unit_retrieved']
@@ -174,8 +179,7 @@ class Application():
         elif 'solid_unit' in kwargs.keys():
             solid_unit_ret = kwargs['solid_unit']
         
-        #solid_unit_ret = solid_unit_ret.real
-        solid_unit_ret = real_space_crystal.real
+        solid_unit_ret = np.fft.ifftshift(solid_unit_ret.real)
         duck_plots = (np.sum(solid_unit_ret, axis=0),\
                       np.sum(solid_unit_ret, axis=1),\
                       np.sum(solid_unit_ret, axis=2))
@@ -231,19 +235,13 @@ class Application():
 
         if 'modulus_error' in kwargs.keys():
             emod = kwargs['modulus_error']
-            if len(emod.shape) == 1 :
-                self.plot_emod.plot(emod)
-            else :
-                for e in emod :
-                    self.plot_emod.plot(e)
+            self.plot_emod.plot(emod)
             self.plot_emod.setTitle('Modulus error l2norm:')
         
-        """
         if 'fidelity_error' in kwargs.keys():
             efid = kwargs['fidelity_error']
             self.plot_efid.plot(efid)
             self.plot_efid.setTitle('Fidelity error l2norm:')
-        """
         
         ## Display the widget as a new window
         w.show()
@@ -275,7 +273,7 @@ class Application():
             ## Display the widget as a new window
             w3.show()
 
-        print 'showing'
+        print('showing')
         ## Start the Qt event loop
 
         sys.exit(app.exec_())
@@ -309,4 +307,4 @@ if __name__ == '__main__':
         
         signal.signal(signal.SIGINT, signal.SIG_DFL)    # allow Control-C
         #app = QtGui.QApplication(sys.argv)
-        ex  = Application(fnam = args.path, **kwargs)
+        ex  = Application(**kwargs)

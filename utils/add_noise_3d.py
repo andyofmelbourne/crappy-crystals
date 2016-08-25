@@ -1,3 +1,9 @@
+# python 2/3 compatibility
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+
 import numpy as np
 
 def add_noise_3d(diff, n, is_fft_shifted = True, remove_courners = True, unit_cell_size=None):
@@ -58,8 +64,8 @@ def add_noise_3d(diff, n, is_fft_shifted = True, remove_courners = True, unit_ce
 
     rav = rad_av(diff_out)
     N = float(n) / (over_sampling * rav[int(np.min(diff.shape) / 2. - 1.)])
-    print 'total number of photons required:', int(N)
-    print 'oversampling :', over_sampling
+    print('total number of photons required:', int(N))
+    print('oversampling :', over_sampling)
 
     # Poisson sampling
     diff_out = np.random.poisson(lam = N * diff_out).astype(np.float64)
