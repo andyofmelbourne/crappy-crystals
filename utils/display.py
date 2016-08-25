@@ -7,6 +7,7 @@ import signal
 import sys
 
 from io_utils import read_input_output_h5
+import crappy_crystals.phasing.symmetry_operations as symmetry_operations 
 
 def show_vol(map_3d):
     signal.signal(signal.SIGINT, signal.SIG_DFL)    # allow Control-C
@@ -74,10 +75,10 @@ def make_crystal(fnam):
         solid_unit = kwargs['solid_unit']
     
     if config['crystal']['space_group'] == 'P1':
-        sym_ops = symmetry_operations.P1 
+        sym_ops = symmetry_operations 
         sym_ops_obj = sym_ops.P1(config['crystal']['unit_cell'], config['detector']['shape'])
     elif config['crystal']['space_group'] == 'P212121':
-        sym_ops = symmetry_operations.P212121 
+        sym_ops = symmetry_operations
         sym_ops_obj = sym_ops.P212121(config['crystal']['unit_cell'], config['detector']['shape'])
     
     Solid_unit = np.fft.fftn(solid_unit, config['detector']['shape'])
@@ -163,7 +164,8 @@ class Iso_surface():
 
 class Application():
 
-    def __init__(self, **kwargs):
+    def __init__(self, fnam, **kwargs):
+        real_space_crystal = make_crystal(fnam)
         
         if 'solid_unit_retrieved' in kwargs.keys():
             solid_unit_ret = kwargs['solid_unit_retrieved']
@@ -172,7 +174,8 @@ class Application():
         elif 'solid_unit' in kwargs.keys():
             solid_unit_ret = kwargs['solid_unit']
         
-        solid_unit_ret = solid_unit_ret.real
+        #solid_unit_ret = solid_unit_ret.real
+        solid_unit_ret = real_space_crystal.real
         duck_plots = (np.sum(solid_unit_ret, axis=0),\
                       np.sum(solid_unit_ret, axis=1),\
                       np.sum(solid_unit_ret, axis=2))
@@ -306,4 +309,4 @@ if __name__ == '__main__':
         
         signal.signal(signal.SIGINT, signal.SIG_DFL)    # allow Control-C
         #app = QtGui.QApplication(sys.argv)
-        ex  = Application(**kwargs)
+        ex  = Application(fnam = args.path, **kwargs)

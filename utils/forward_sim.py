@@ -1,7 +1,8 @@
 import numpy as np
 import crappy_crystals.solid_units 
 import crappy_crystals.phasing.symmetry_operations as symmetry_operations 
-import disorder
+from crappy_crystals.utils import disorder
+from crappy_crystals.utils import add_noise_3d
 
 
 def generate_diff(config):

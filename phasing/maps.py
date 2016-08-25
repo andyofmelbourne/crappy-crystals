@@ -124,9 +124,9 @@ class Mapper_naive():
             dtype = np.float64
         
         if isValid('c_dtype', args) :
-            dtype = args['c_dtype']
+            c_dtype = args['c_dtype']
         else :
-            dtype = np.complex128
+            c_dtype = np.complex128
         
         # initialise the object
         #-----------------------------------------------
