@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 
-import sys
-import os
 import ConfigParser
 import numpy as np
 import subprocess
+
+import os, sys
+sys.path.append(os.path.abspath(__file__)[:-len(__file__)])
 
 import crappy_crystals
 import crappy_crystals.utils as utils

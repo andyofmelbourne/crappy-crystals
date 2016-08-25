@@ -1,10 +1,15 @@
 import numpy as np
-import sys
-import os
 import ConfigParser
 import time
 import re
 import copy
+
+import phasing_3d
+
+# insert the directory in which this file is being executed from
+# into sys.path
+import os, sys
+sys.path.append(os.path.abspath(__file__)[:-len(__file__)])
 
 import crappy_crystals
 import crappy_crystals.utils
@@ -12,7 +17,6 @@ from crappy_crystals import utils
 from crappy_crystals.gpu.phasing.maps import Mapper_naive as Mapper_naive_gpu 
 from crappy_crystals.phasing.maps import Mapper_naive, Mapper_ellipse
 
-import phasing_3d
 
 def config_iters_to_alg_num(string):
     # split a string like '100ERA 200DM 50ERA' with the numbers
