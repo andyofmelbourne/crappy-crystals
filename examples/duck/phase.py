@@ -14,7 +14,6 @@ sys.path.append(os.path.abspath(__file__)[:-len(__file__)])
 import crappy_crystals
 import crappy_crystals.utils
 from crappy_crystals import utils
-from crappy_crystals.gpu.phasing.maps import Mapper_naive as Mapper_naive_gpu 
 from crappy_crystals.phasing.maps import Mapper_naive, Mapper_ellipse
 
 
@@ -58,6 +57,7 @@ def phase(I, support, params, good_pix = None, sample_known = None):
 
     if params['phasing']['mapper'] == 'naive' :
         if params['phasing_parameters']['hardware'] == 'gpu':
+            from crappy_crystals.gpu.phasing.maps import Mapper_naive as Mapper_naive_gpu 
             params['phasing_parameters']['Mapper'] = Mapper_naive_gpu
         else :
             params['phasing_parameters']['Mapper'] = Mapper_naive
