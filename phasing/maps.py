@@ -235,6 +235,7 @@ class Mapper_ellipse():
     def __init__(self, I, **args):
         """
         """
+        print('Hello I am mapper ellipse')
         # dtype
         #-----------------------------------------------
         if isValid('dtype', args) :
