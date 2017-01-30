@@ -550,40 +550,64 @@ def choose_N_highest_pixels(array, N, tol = 1.0e-5, maxIters=1000, mapper = None
     If support is not None then values outside the support
     are ignored. 
     """
-
+    
     # no overlap constraint
     if mapper is not None :
         syms = mapper(array)
         # if array is not the maximum value
         # of the M symmetry related units 
         # then do not update 
-        support = syms[0] == np.max(syms, axis=0) 
-        a = array[support]
+        max_support = syms[0] == np.max(syms, axis=0) 
+        a = array[max_support]
     else :
-        support = np.ones(array.shape, dtype = np.bool)
+        max_support = np.ones(array.shape, dtype = np.bool)
         a = array
-
+    
     if support is not None :
         a = array[support > 0]
     else :
         a = array
         support = 1
     
+    # search for the cutoff value
     s0 = array.max()
     s1 = array.min()
     
+    failed = False
     for i in range(maxIters):
         s = (s0 + s1) / 2.
         e = np.sum(a > s) - N
-    
+          
         if np.abs(e) < tol :
             break
-
+        
         if e < 0 :
             s0 = s
         else :
             s1 = s
+
+        if np.abs(s0 - s1) < tol and np.abs(e) > tol :
+            failed = True
+            break
+
+        print(s, s0, s1)
         
-    S = (array > s) * support
-    # print('number of pixels in support:', np.sum(S), i, s, e)
+    S = (array > s) * max_support * support
+    
+    # if failed is True then there are a lot of 
+    # entries in a that equal s
+    if failed :
+        # if S is less than the 
+        # number of voxels then include 
+        # some of the pixels where array == s
+        count      = np.sum(S)
+        ii, jj, kk = np.where(np.abs(array-s)<tol)
+        l          = N - count
+        print(count, N, l, len(ii))
+        if l > 0 :
+            S[ii[:l], jj[:l], kk[:l]]    = True
+        else :
+            S[ii[:-l], jj[:-l], kk[:-l]] = False
+    
+    print('number of pixels in support:', np.sum(S), i, s, e)
     return S
