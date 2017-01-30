@@ -538,7 +538,7 @@ def make_unitary_transform(N):
     return U
 
 
-def choose_N_highest_pixels(array, N, tol = 1.0e-5, maxIters=1000, mapper = None, support = None):
+def choose_N_highest_pixels(array, N, tol = 1.0e-10, maxIters=1000, mapper = None, support = None):
     """
     Use bisection to find the root of
     e(x) = \sum_i (array_i > x) - N
@@ -566,7 +566,6 @@ def choose_N_highest_pixels(array, N, tol = 1.0e-5, maxIters=1000, mapper = None
     if support is not None :
         a = array[support > 0]
     else :
-        a = array
         support = 1
     
     # search for the cutoff value
@@ -578,7 +577,8 @@ def choose_N_highest_pixels(array, N, tol = 1.0e-5, maxIters=1000, mapper = None
         s = (s0 + s1) / 2.
         e = np.sum(a > s) - N
           
-        if np.abs(e) < tol :
+        if e == 0 :
+            print('e==0, exiting...')
             break
         
         if e < 0 :
@@ -586,17 +586,18 @@ def choose_N_highest_pixels(array, N, tol = 1.0e-5, maxIters=1000, mapper = None
         else :
             s1 = s
 
-        if np.abs(s0 - s1) < tol and np.abs(e) > tol :
+        print(s, s0, s1, e)
+        if np.abs(s0 - s1) < tol and np.abs(e) > 0 :
             failed = True
+            print('s0==s1, exiting...')
             break
-
-        print(s, s0, s1)
         
     S = (array > s) * max_support * support
     
     # if failed is True then there are a lot of 
     # entries in a that equal s
     if failed :
+        print('failed, sum(S), voxels:',np.sum(S), N)
         # if S is less than the 
         # number of voxels then include 
         # some of the pixels where array == s
