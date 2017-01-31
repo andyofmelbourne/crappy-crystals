@@ -365,8 +365,11 @@ class Mapper_ellipse():
 
         # finite support
         if self.voxel_number :
+            #self.S = choose_N_highest_pixels( (out * out.conj()).real, self.voxel_number, \
+                    #        support = self.support, mapper = self.sym_ops.solid_syms_real)
+            # try using the crystal mapping instead of the unit-cell mapping
             self.S = choose_N_highest_pixels( (out * out.conj()).real, self.voxel_number, \
-                    support = self.support, mapper = self.sym_ops.solid_syms_real)
+                    support = self.support, mapper = self.sym_ops.solid_syms_cryst_real)
 
         out *= self.S
 
@@ -587,7 +590,7 @@ def choose_N_highest_pixels(array, N, tol = 1.0e-10, maxIters=1000, mapper = Non
         else :
             s1 = s
 
-        print(s, s0, s1, e)
+        #print(s, s0, s1, e)
         if np.abs(s0 - s1) < tol and np.abs(e) > 0 :
             failed = True
             print('s0==s1, exiting...')
@@ -598,12 +601,12 @@ def choose_N_highest_pixels(array, N, tol = 1.0e-10, maxIters=1000, mapper = Non
     # if failed is True then there are a lot of 
     # entries in a that equal s
     if failed :
-        print('failed, sum(S), voxels:',np.sum(S), N)
+        print('failed, sum(max_support), sum(S), voxels:',np.sum(max_support), np.sum(S), N)
         # if S is less than the 
         # number of voxels then include 
         # some of the pixels where array == s
         count      = np.sum(S)
-        ii, jj, kk = np.where(np.abs(array-s)<tol)
+        ii, jj, kk = np.where(np.abs(array-s)<=tol)
         l          = N - count
         print(count, N, l, len(ii))
         if l > 0 :
