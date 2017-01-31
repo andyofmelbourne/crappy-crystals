@@ -368,7 +368,7 @@ class Mapper_ellipse():
             #self.S = choose_N_highest_pixels( (out * out.conj()).real, self.voxel_number, \
                     #        support = self.support, mapper = self.sym_ops.solid_syms_real)
             # try using the crystal mapping instead of the unit-cell mapping
-            self.S = choose_N_highest_pixels( (out * out.conj()).real, self.voxel_number, \
+            self.S = choose_N_highest_pixels( (out * out.conj()).real.astype(np.float16), self.voxel_number, \
                     support = self.support, mapper = self.sym_ops.solid_syms_cryst_real)
 
         out *= self.S
