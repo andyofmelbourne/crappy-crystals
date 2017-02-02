@@ -116,6 +116,7 @@ class Mapper_naive():
                 'eCon'  : the convergence error for each iteration:
                           eCon_i = sqrt( sum(| O_i - O_i-1 |^2) / sum(| O_i |^2) )
         """
+        print('Hello I am the naive mapper')
         # dtype
         #-----------------------------------------------
         if isValid('dtype', args) :
@@ -260,25 +261,32 @@ class Mapper_ellipse():
         #-----------------------------------------------
         self.mask = 1
         if isValid('mask', args):
+            print('setting mask...')
             self.mask = args['mask']
+            print(np.sum(~self.mask), 'bad pixels')
+            print(np.sum(self.mask), 'good pixels')
+            print(self.mask.dtype, 'good pixels dtype')
         
         self.alpha = 1.0e-10
         if isValid('alpha', args):
             self.alpha = args['alpha']
         
         self.I_norm = (self.mask * I).sum()
+        print('\nI_norm:', self.I_norm)
         self.amp    = np.sqrt(I.astype(dtype))
         
         # define the support projection
         #-----------------------------------------------
+        if isValid('support', args) :
+            self.support = args['support']
+        else :
+            self.support = 1
+        
         if isValid('voxel_number', args) :
             self.voxel_number = args['voxel_number']
-            self.support = None
             self.S       = None
         else :
             self.voxel_number = False
-            #
-            self.support = args['support']
             self.S       = self.support.copy()
         
         # make the unit cell and diffuse weightings
@@ -290,8 +298,16 @@ class Mapper_ellipse():
         lattice    = symmetry_operations.lattice(args['crystal']['unit_cell'], args['detector']['shape'])
         self.unit_cell = args['crystal']['unit_cell']
 
-        self.unit_cell_weighting = N * lattice * exp
-        self.diffuse_weighting   = (1. - exp)
+        self.unit_cell_weighting = self.mask * N * lattice * exp
+        self.diffuse_weighting   = self.mask * (1. - exp)
+
+        if isValid('turn_off_bragg', args) :
+            print('setting the Bragg peak weighting to zero')
+            self.unit_cell_weighting.fill(0)
+        
+        if isValid('turn_off_diffuse', args) :
+            print('setting the diffuse scttering weighting to zero')
+            self.diffuse_weighting.fill(0)
         
         self.modes = np.zeros( (2 * self.sym_ops.syms.shape[0],) + self.sym_ops.syms.shape[1:], O.dtype)
         # diffuse terms
@@ -330,6 +346,8 @@ class Mapper_ellipse():
         self.e1     = np.zeros_like(self.unit_cell_weighting)
         self.e1[~m] = np.sqrt(I[~m]) / np.sqrt(self.sym_ops.syms.shape[0] * self.unit_cell_weighting[~m])
 
+        print('number of good pixels for elliptical projections: e0, e1, both', np.sum(~self.e0_inf), np.sum(~self.e1_inf), np.sum(~self.e1_inf * ~self.e0_inf))
+
         self.iters = 0
          
     def object(self, modes):
@@ -366,11 +384,11 @@ class Mapper_ellipse():
         # finite support
         if self.voxel_number :
             #self.S = choose_N_highest_pixels( (out * out.conj()).real, self.voxel_number, \
-                    #        support = self.support, mapper = self.sym_ops.solid_syms_real)
+            #                support = self.support, mapper = self.sym_ops.solid_syms_real)
             # try using the crystal mapping instead of the unit-cell mapping
             self.S = choose_N_highest_pixels( (out * out.conj()).real.astype(np.float16), self.voxel_number, \
-                    support = self.support, mapper = self.sym_ops.solid_syms_cryst_real)
-
+                    support = self.support, mapper = self.sym_ops.solid_syms_crystal_real)
+        
         out *= self.S
 
         # reality
@@ -386,6 +404,7 @@ class Mapper_ellipse():
 
         self.iters += 1
         
+        #print(' sum | sqrt(I) - sqrt(Imap) | : ', self.Emod(modes_out))
         return modes_out
 
     def Pmod(self, modes):
@@ -426,12 +445,12 @@ class Mapper_ellipse():
                                     ['writeonly', 'no_broadcast']])
         for e0, e1, xi, yi, e0_inf, e1_inf, uu, vv in it:
             uu[...], vv[...] = project_2D_Ellipse_cython(e0, e1, xi, yi, e0_inf, e1_inf)
-
+        
             # check
-            #if (not e0_inf) and (not e1_inf) :
-            #    err = abs((uu[...] / e0)**2 + (vv[...] / e1)**2 - 1.)
-            #    if err > tol :
-            #        print('e0, e1, xi, yi, xp, yp, err:', e0, e1, xi, yi, uu[...], vv[...], err)
+            if (not e0_inf) and (not e1_inf) :
+                err = abs((uu[...] / e0)**2 + (vv[...] / e1)**2 - 1.)
+                if err > tol :
+                    print('e0, e1, xi, yi, xp, yp, err:', e0, e1, xi, yi, uu[...], vv[...], err)
 
         
         # xp yp --> modes
@@ -445,9 +464,9 @@ class Mapper_ellipse():
         
         # un rotate the y's
         out[modes.shape[0]//2 :] = np.dot(Ut.T, u).reshape(U.shape)
-
         # check
         #print(' sum | sqrt(I) - sqrt(Imap) | : ', self.Emod(out))
+        #print('Pmod -->  sum | modes - out | : ', np.sum( np.abs(modes - out) ))
         
         return out
     
@@ -455,6 +474,14 @@ class Mapper_ellipse():
         M         = self.Imap(modes)
         eMod      = np.sum( self.mask * ( np.sqrt(M) - self.amp )**2 )
         eMod      = np.sqrt( eMod / self.I_norm )
+
+        #if eMod < 1.0e-1 :
+        #    import h5py 
+        #    f = h5py.File('test')
+        #    f['amp'] = self.amp
+        #    f['amp_forward'] = np.sqrt(M)
+        #    f.close()
+        #    sys.exit()
         return eMod
 
     def finish(self, modes):
@@ -466,9 +493,11 @@ class Mapper_ellipse():
     def l2norm(self, delta, array0):
         num = 0
         den = 0
+        #print('l2norm --> np.sum(|delta|**2)', np.sum(np.abs(delta)**2))
+        #print('l2norm --> np.sum(|array0|**2)', np.sum(np.abs(array0)**2))
         for i in range(delta.shape[0]):
-            num += np.sum( (delta[0] * delta[0].conj()).real ) 
-            den += np.sum( (array0[0] * array0[0].conj()).real ) 
+            num += np.sum( (delta[i] * delta[i].conj()).real ) 
+            den += np.sum( (array0[i] * array0[i].conj()).real ) 
         return np.sqrt(num / den)
 
     def scans_cheshire(self, solid):
@@ -567,7 +596,7 @@ def choose_N_highest_pixels(array, N, tol = 1.0e-10, maxIters=1000, mapper = Non
         max_support = np.ones(array.shape, dtype = np.bool)
         a = array
     
-    if support is not None :
+    if support is not None and support is not 1 :
         a = array[support > 0]
     else :
         support = 1
@@ -582,7 +611,7 @@ def choose_N_highest_pixels(array, N, tol = 1.0e-10, maxIters=1000, mapper = Non
         e = np.sum(a > s) - N
           
         if e == 0 :
-            print('e==0, exiting...')
+            #print('e==0, exiting...')
             break
         
         if e < 0 :
@@ -614,5 +643,5 @@ def choose_N_highest_pixels(array, N, tol = 1.0e-10, maxIters=1000, mapper = Non
         else :
             S[ii[:-l], jj[:-l], kk[:-l]] = False
     
-    print('number of pixels in support:', np.sum(S), i, s, e)
+    #print('number of pixels in support:', np.sum(S), i, s, e)
     return S

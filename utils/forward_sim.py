@@ -2,6 +2,7 @@ import numpy as np
 import crappy_crystals.solid_units 
 import crappy_crystals.phasing.symmetry_operations as symmetry_operations 
 from crappy_crystals.utils import disorder
+from crappy_crystals.utils import padding
 from crappy_crystals.utils import add_noise_3d
 
 
@@ -34,9 +35,16 @@ def generate_diff(config):
     
     lattice = symmetry_operations.lattice(config['simulation']['unit_cell'], config['detector']['shape'])
     
-    diff  = N * exp * lattice * np.abs(np.sum(modes, axis=0)**2)
-    diff += (1. - exp) * np.sum(np.abs(modes)**2, axis=0)
-
+    B  = N * exp * lattice * np.abs(np.sum(modes, axis=0)**2)
+    D  = (1. - exp) * np.sum(np.abs(modes)**2, axis=0)
+    if 'turn_off_bragg' in config['simulation'].keys() and config['simulation']['turn_off_bragg']:
+        print '\nExluding Bragg peaks'
+        B = 0 
+    elif 'turn_off_diffuse' in config['simulation'].keys() and config['simulation']['turn_off_diffuse']:
+        print '\nExluding diffuse scattering'
+        D = 0
+    diff = B + D
+    
     # add noise
     if config['simulation']['photons'] is not None :
         diff, edges = add_noise_3d.add_noise_3d(diff, config['simulation']['photons'], \
@@ -60,10 +68,15 @@ def generate_diff(config):
 
     # add a beamstop
     if config['simulation']['beamstop'] is not None :
+        print('making beamstop...')
         beamstop = beamstop.make_beamstop(diff.shape, config['simulation']['beamstop'])
         diff    *= beamstop
     else :
         beamstop = np.ones_like(diff, dtype=np.bool)
+        
+    # testing
+    #beamstop = lattice > 1.0e-1
+    #diff    *= beamstop
 
     print 'Simulation: number of voxels in solid unit:', np.sum(solid_unit_expanded > (1.0e-5 + solid_unit_expanded.min()))
     print 'Simulation: number of voxels in support   :', np.sum(support)

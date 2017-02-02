@@ -209,7 +209,7 @@ def read_input_output_h5(fnam):
         kwargs['sample_support'] = kwargs['sample_support'].astype(np.bool)
         print 'sample_support np.int16 --> np.bool'
     
-    if 'good_pixels' in kwargs.keys():
-        kwargs['good_pixels'] = kwargs['good_pixels'].astype(np.bool)
-        print 'good_pixels np.int16 --> np.bool'
+    if 'good_pix' in kwargs.keys():
+        kwargs['good_pix'] = kwargs['good_pix'].astype(np.bool)
+        print 'good_pix np.int16 --> np.bool'
     return kwargs

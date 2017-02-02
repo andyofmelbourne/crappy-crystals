@@ -51,6 +51,11 @@ def make_3D_duck(shape = (12, 25, 30)):
 
     # get rid of the crap
     duck3d[np.where(duck3d < 0.1)] = 0.0
+
+    # zero the edges
+    duck3d[0, :, :] = 0
+    duck3d[:, 0, :] = 0
+    duck3d[:, :, 0] = 0
     return duck3d
         
 if __name__ == '__main__':

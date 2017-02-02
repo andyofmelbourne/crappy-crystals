@@ -31,6 +31,7 @@ class P1():
         T0 = 1
         
         self.translations = np.array([T0])
+        self.unitcell_size = unitcell_size
         
         # keep an array for the 1 symmetry related coppies of the solid unit
         self.syms = np.zeros((1,) + tuple(det_shape), dtype=dtype)
@@ -55,6 +56,43 @@ class P1():
         out = np.empty_like(U)
         out[0] = U[0]
         return out
+    
+    def solid_syms_crystal_real(self, solid):
+        """
+        Generate the symmetry related copies of the real-space solid unit
+        in the crystal. This includes all symmetry related coppies of the 
+        solid unit that fit within the field-of-view (not just the unit-cell
+        as in solid_syms_real).
+        """
+        # calculate the number of times that we need to tile the unit-cell 
+        # unit so that we fill the field-of-view
+        tiles = np.ceil(2*np.array(solid.shape, dtype=np.float) / np.array(self.unitcell_size, dtype=np.float) - 1.0).astype(np.int)
+        
+        # get the symmetry related coppies of solid in the unit-cell
+        # hopefully these fit in the field-of-view...
+        syms = self.solid_syms_real(solid)
+
+        # un-fftshift them
+        syms = np.fft.fftshift(syms, axes=(1,2,3))
+        
+        # now translate each solid sym by tiles in each dimension, this could really blow up...
+        syms_crystal = np.zeros( (len(syms) * np.prod(tiles),) + syms.shape[1:], dtype=syms.dtype)
+        syms_crystal[: len(syms)] = syms
+        
+        index = len(syms)
+        for sym in syms :
+            for i in (np.arange(tiles[0]) - tiles[0]//2):
+                for j in (np.arange(tiles[1]) - tiles[1]//2):
+                    for k in (np.arange(tiles[2]) - tiles[2]//2):
+                        if i == 0 and j == 0 and k == 0 :
+                            continue
+                        shift = np.array([i, j, k]) * np.array(self.unitcell_size)
+                        #print(i,j,k, shift, index)
+                        syms_crystal[index] = multiroll_nowrap(sym, shift)
+                        index += 1
+        
+        syms_crystal = np.fft.ifftshift(syms_crystal, axes=(1,2,3))
+        return syms_crystal
 
 class P212121():
     """
