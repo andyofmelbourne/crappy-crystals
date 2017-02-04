@@ -17,6 +17,19 @@ def interp_3d(array, shapeout):
     arrayout = griddata(points, values, (gridout[0], gridout[1], gridout[2]), method='nearest')
     return arrayout
     
+def interp_2d(array, shapeout):
+    from scipy.interpolate import griddata
+    ijk = np.indices(array.shape)
+    
+    points = np.zeros((array.size, 2), dtype=np.float)
+    points[:, 0] = ijk[0].ravel()
+    points[:, 1] = ijk[1].ravel()
+    values = array.astype(np.float).ravel()
+
+    gridout  = np.mgrid[0: array.shape[0]-1: shapeout[0]*1j, \
+                        0: array.shape[1]-1: shapeout[1]*1j]
+    arrayout = griddata(points, values, (gridout[0], gridout[1]), method='nearest')
+    return arrayout
 
 def make_3D_duck(shape = (12, 25, 30)):
     script_dir = os.path.dirname(__file__)
@@ -28,35 +41,34 @@ def make_3D_duck(shape = (12, 25, 30)):
     # convert to bool
     duck = duck < 50
 
+    # interpolate onto the desired grid
+    duck = interp_2d(duck, shape[1:])
+
     # make a 3d volume
-    duck3d = np.zeros( (100,) + duck.shape , dtype=np.bool)
+    duck3d = np.zeros(shape , dtype=np.bool)
 
-    # loop over the third dimension with an expanding circle
-    i, j = np.mgrid[0 :duck.shape[0], 0 :duck.shape[1]]
-
-    origin = [150, 150]
+    # loop over the first dimension with an expanding circle
+    i, j = np.mgrid[0 :shape[1], 0 :shape[2]]
+    
+    origin = [int(1.5*shape[1]/2), shape[2]//2]
 
     r = np.sqrt( ((i-origin[0])**2 + (j-origin[1])**2).astype(np.float) )
 
-    rs = range(50) + range(50, 0, -1)
-    rs = np.array(rs) * 200 / 50.
+    rs = range(shape[0]//2) + range(shape[0]//2, 0, -1)
+    rs = np.array(rs) * min(shape[1], shape[2]) / (shape[0]/2.)
     
     circle = lambda ri : r < ri
     
     for z in range(duck3d.shape[0]):
         duck3d[z, :, :] = circle(rs[z]) * duck
-
-    # now interpolate the duck onto the required grid
-    duck3d = interp_3d(duck3d, shape)
-
-    # get rid of the crap
-    duck3d[np.where(duck3d < 0.1)] = 0.0
-
+    
     # zero the edges
     duck3d[0, :, :] = 0
     duck3d[:, 0, :] = 0
     duck3d[:, :, 0] = 0
     return duck3d
+
         
 if __name__ == '__main__':
-    duck3d = make_3D_duck()
+    #duck3d = make_3D_duck()
+    duck3d = make_3D_duck2()

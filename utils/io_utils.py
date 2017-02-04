@@ -1,5 +1,25 @@
 import numpy as np
 
+def isValid(thing, d=None):
+    """
+    checks if 'thing' is valid. If d (a dictionary is not None) then
+    check if d['thing'] is valid.
+    """
+    valid = False
+    
+    if d is not None :
+        if thing not in d.keys():
+            return valid 
+        else :
+            thing2 = d[thing]
+    else :
+		thing2 = thing
+    
+    if thing2 is not None and thing2 is not False :
+        valid = True
+    
+	return valid
+
 def parse_cmdline_args():
     import argparse
     import os
@@ -148,9 +168,6 @@ def write_input_output_h5(fnam, **kwargs):
                 h += line
             f.create_dataset('config_file', data = np.array(h))
             f.create_dataset('config_file_name', data = np.array(value))
-        elif value.dtype == bool :
-            print 'writing:', key, value.shape, value.dtype
-            f.create_dataset(key, data = value.astype(np.int16))
         else :
             print 'writing:', key, value.shape, value.dtype
             f.create_dataset(key, data = value)
@@ -204,12 +221,4 @@ def read_input_output_h5(fnam):
             
             print value.dtype, value.shape
     f.close()
-    
-    if 'sample_support' in kwargs.keys():
-        kwargs['sample_support'] = kwargs['sample_support'].astype(np.bool)
-        print 'sample_support np.int16 --> np.bool'
-    
-    if 'good_pix' in kwargs.keys():
-        kwargs['good_pix'] = kwargs['good_pix'].astype(np.bool)
-        print 'good_pix np.int16 --> np.bool'
     return kwargs
