@@ -77,6 +77,11 @@ if __name__ == '__main__':
         duck       = duck_3D.make_3D_duck(shape = params['shape'])
         solid_unit = np.zeros(params['detector'], dtype=np.complex)
         solid_unit[:duck.shape[0], :duck.shape[1], :duck.shape[2]] = duck
+
+        # position the solid unit in the unit cell
+        solid_unit = np.roll(solid_unit, params['position'][0], 0)
+        solid_unit = np.roll(solid_unit, params['position'][1], 1)
+        solid_unit = np.roll(solid_unit, params['position'][2], 2)
     else :
         raise ValueError("solid_unit not supported, can only be 'duck' at this point...")
     
