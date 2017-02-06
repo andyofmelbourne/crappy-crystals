@@ -263,7 +263,7 @@ class P212121():
                     
                     shift = np.array([i, j, k]) * np.array(self.unitcell_size)
                     
-                    print(i,j,k, shift, U.shape)
+                    #print(i,j,k, shift, U.shape)
                     #print(i,j,k, shift, index)
                     C += multiroll_nowrap(U, shift, y = t)
         

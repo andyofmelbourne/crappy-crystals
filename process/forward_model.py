@@ -96,8 +96,13 @@ if __name__ == '__main__':
                                
     # output
     ########
-    f = h5py.File(fnam)
     outputdir = os.path.split(args.filename)[0]
+
+    # mkdir if it does not exist
+    if not os.path.exists(outputdir):
+        os.makedirs(outputdir)
+    
+    f = h5py.File(fnam)
     
     group = '/forward_model'
     if group not in f:
@@ -132,3 +137,11 @@ if __name__ == '__main__':
             print('could not write:', h5_key, ':', e)
         
     f.close() 
+	
+	# copy the config file
+    ######################
+    try :
+        import shutil
+        shutil.copy(args.config, outputdir)
+    except Exception as e :
+		print(e)
