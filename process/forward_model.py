@@ -126,7 +126,7 @@ if __name__ == '__main__':
     f[key] = solid_unit
     
     # everything else
-    for key, value in info.iteritems():
+    for key, value in info.items():
         if value is None :
             continue 
         
@@ -142,11 +142,11 @@ if __name__ == '__main__':
             print('could not write:', h5_key, ':', e)
         
     f.close() 
-	
-	# copy the config file
+    
+    # copy the config file
     ######################
     try :
         import shutil
         shutil.copy(args.config, outputdir)
     except Exception as e :
-		print(e)
+        print(e)

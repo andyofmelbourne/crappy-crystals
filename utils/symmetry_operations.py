@@ -6,6 +6,7 @@ from __future__ import unicode_literals
 import numpy as np
 import math
 from itertools import product
+from functools import reduce
 
 
 class P1():

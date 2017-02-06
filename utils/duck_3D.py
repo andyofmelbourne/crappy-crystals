@@ -1,3 +1,16 @@
+#!/usr/bin/env python
+
+# for python 2 / 3 compatibility
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+
+try :
+    range = xrange
+except NameError :
+    pass
+
 import numpy as np
 import os
 
@@ -54,7 +67,7 @@ def make_3D_duck(shape = (12, 25, 30)):
 
     r = np.sqrt( ((i-origin[0])**2 + (j-origin[1])**2).astype(np.float) )
 
-    rs = range(shape[0]//2) + range(shape[0]//2, 0, -1)
+    rs = list(range(shape[0]//2)) + list(range(shape[0]//2, 0, -1))
     rs = np.array(rs) * min(shape[1], shape[2]) / (shape[0]/2.)
     
     circle = lambda ri : r < ri
