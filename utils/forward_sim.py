@@ -45,10 +45,10 @@ def generate_diff(solid_unit, unit_cell, N, sigma, **params):
     
     unit_cell : sequence of length 3, int
         The pixel dimensions of the unit-cell
-
+    
     N : int
         The number of unit-cells per crystal
-
+    
     sigma : float
         The disorder parameter of the crystal
     
@@ -115,22 +115,28 @@ def generate_diff(solid_unit, unit_cell, N, sigma, **params):
         
         'support' : numpy.ndarray, bool, (True = contains solid unit, False = does not)
             may be padded if support_frac is not None or False
-
+        
         'background' : numpy.ndarray, float 
             the background, all 0. if no background was requested
-
+        
         'lattice' : numpy.ndarray, float 
             the lattice function of the crystal in the diffraction volume
-
+        
         'voxels' : int
             the number of non-zero pixels in the solid_unit.
-
+        
         'crystal' : numpy.ndarray, complex
             the real-space crystal function in the field-of-view
-
+        
         'unit_cell' : numpy.ndarray, complex
             the real-space unit-cell function in the field-of-view
-
+        
+        'diffuse_weighting' : numpy.ndarray, float
+            (1 - exp) 
+        
+        'Bragg_weighting' : numpy.ndarray, float
+            N * exp * lattice
+        
         'sym' : class object 
             an object for performing symmetry operations on the solid unit
     """

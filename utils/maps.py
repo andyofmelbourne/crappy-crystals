@@ -235,8 +235,61 @@ class Mapper_ellipse():
 
     def __init__(self, I, **args):
         """
+        A class for performing mapping operations on crappy crystal modes.
+
+        This class profides an object that can be used by 3D-phasing, which
+        requires the following methods:
+            I     = mapper.Imap(modes)   # mapping the modes to the intensity
+            modes = mapper.Pmod(modes)   # applying the data projection to the modes
+            modes = mapper.Psup(modes)   # applying the support projection to the modes
+            O     = mapper.object(modes) # the main object of interest
+            dict  = mapper.finish(modes) # add any additional output to the info dict
+        
+        
+        Parameters
+        ----------
+        I : numpy.ndarray, float
+            The 3D diffraction volume
+        
+        Keyword Arguments
+        -----------------
+        solid_unit : numpy.ndarray, optional, default (None)
+            The solid_unit of the crystal. If None then it is initialised
+            with random numbers.
+        
+        mask : numpy.ndarray, optional, default (None)
+            bad pixel mask for the diffraction volume. If None then every 
+            pixel is used. Bad pixels = False
+        
+        support : numpy.ndarray, optional, default (None)
+            A fixed support volume, if support[i] = 0 then the object is
+            not at pixel i  
+        
+        voxels : integer, optional, default (None)
+            The number of pixels that the solid_unit can occupy.
+        
+        sym : object, optional, default (None)
+            A crystal symmetry operator, if None then this object is created 
+            with 'unit_cell' and 'space_group' (see below).
+        
+        unit_cell : sequence of length 3, int
+            The pixel dimensions of the unit-cell
+        
+        space_group : string, optional, default ('P1')
+        
+        alpha : float, optional, default (1.0e-10)
+            floating point offset to prevent divide by zeros: a / (b + alpha)
+        
+        dtype : np.dtype, optional, default (np.float64)
+        
+        c_dtype : np.dtype, optional, default (np.complex128)
+        
+        turn_off_bragg : bool, optional, default (False)
+            If True then exclude the Bragg peaks from the diffraction volume
+        
+        turn_off_diffuse : bool, optional, default (False)
+            If True then exclude the diffuse scatter from the diffraction volume
         """
-        print('Hello I am mapper ellipse')
         # dtype
         #-----------------------------------------------
         if isValid('dtype', args) :
@@ -251,8 +304,8 @@ class Mapper_ellipse():
 
         # initialise the object
         #-----------------------------------------------
-        if isValid('O', args):
-            O = np.fft.fftn(args['O'])
+        if isValid('solid_unit', args):
+            O = np.fft.fftn(args['solid_unit'])
         else :
             print('initialising object with random numbers')
             O = np.random.random(I.shape).astype(c_dtype)
@@ -282,8 +335,8 @@ class Mapper_ellipse():
         else :
             self.support = 1
         
-        if isValid('voxel_number', args) :
-            self.voxel_number = args['voxel_number']
+        if isValid('voxels', args) :
+            self.voxel_number = args['voxels']
             self.S       = None
         else :
             self.voxel_number = False
