@@ -401,29 +401,66 @@ class Mapper_ellipse():
         tol = 15. #1.0e+15
         
         # check for numbers close to infinity in sqrt(I / self.diffuse_weighting)
-        m     = self.diffuse_weighting <= 10.**(-tol)
-        m[~m] = 0.5 * (np.log10(I[~m]) - np.log10(self.diffuse_weighting[~m])) >= tol
+        m = (self.diffuse_weighting <= 10.**(-tol)) + (I <= 10.**(-tol))
+        m[~m] = (0.5 * (np.log10(I[~m]) - np.log10(self.diffuse_weighting[~m])) >= tol) 
         
         self.e0_inf   = m.copy()
         self.e0       = np.zeros_like(self.diffuse_weighting)
+
+        # set e0 for pixels where I>0, diffuse>0, and I/diffuse < inf
         self.e0[~m]   = np.sqrt(I[~m]) / np.sqrt(self.diffuse_weighting[~m])
+        
+        # set e0 for pixels where I~0
+        m = (I <= 10.**(-tol))
+        self.e0[m]  = 0.
                
         # check for numbers close to infinity in sqrt(I / self.unit_cell_weighting)
-        m     = self.unit_cell_weighting <= 10.**(-tol)
+        m     = (self.unit_cell_weighting <= 10.**(-tol)) + (I <= 10.**(-tol))
         m[~m] = 0.5 * (np.log10(I[~m]) - np.log10(self.unit_cell_weighting[~m])) >= tol
               
         self.e1_inf = m.copy()
+        
+        # set e1 for pixels where I>0, Bragg>0, and I/Bragg < inf
         self.e1     = np.zeros_like(self.unit_cell_weighting)
         self.e1[~m] = np.sqrt(I[~m]) / np.sqrt(self.sym_ops.no_solid_units * self.unit_cell_weighting[~m])
+        
+        # set e1 for pixels where I~0
+        m = (I <= 10.**(-tol))
+        self.e1[m] = 0.
         
         print('number of good pixels for elliptical projections: e0, e1, both', np.sum(~self.e0_inf), np.sum(~self.e1_inf), np.sum(~self.e1_inf * ~self.e0_inf))
         
         self.iters = 0
+        
+        # check that self.Imap == I * (x/e_0)**2 + (y/e_1)**2
+        # or that (x/e_0)**2 + (y/e_1)**2 = 1
+        U  = self.modes[self.modes.shape[0]//2 :]
+        D  = self.modes[: self.modes.shape[0]//2]
+        # make x
+        x = np.sqrt(np.sum( (D * D.conj()).real, axis=0))
+        # make y
+        Ut = make_unitary_transform(self.modes.shape[0]//2)
+        u = np.dot(Ut, U.reshape((U.shape[0], -1)))
+        y = np.abs(np.sum(U, axis=0) / np.sqrt(U.shape[0]))
+        
+        # check for all pixels where e0 != 0 or inf
+        iden = np.zeros_like(I)
+        i = ~self.e0_inf * (self.e0 > 0.)
+        iden[i] += (x[i]/self.e0[i])**2
+        
+        i = ~self.e1_inf * (self.e1 > 0.)
+        iden[i] += (y[i]/self.e1[i])**2
+        
+        i = (self.e0 == 0) * (self.e1 == 0)
+        iden[i] = 1.
+        
+        print('Checking that (x/e0)**2 + (y/e1)**2 == 1?')
+        print('np.sum(((x/e0)**2 + (y/e1)**2 - 1)**2):', np.sum((iden - 1)**2))
          
     def object(self, modes):
         out = np.fft.ifftn(modes[0])
         return out
-
+    
     def Imap(self, modes):
         U  = np.sum(modes[modes.shape[0]//2 :], axis=0)
         D  = modes[: modes.shape[0]//2]
