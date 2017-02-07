@@ -1,9 +1,8 @@
 import os
 import numpy as np
-import noise
-import support
-import circle
-import os
+from . import noise
+from . import support
+from . import circle
 
 def generate_diff(config):
     solid_unit = make_3D_duck(shape = config['sample']['shape'])

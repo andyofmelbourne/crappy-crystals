@@ -115,6 +115,7 @@ class P212121():
     def __init__(self, unitcell_size, det_shape, dtype=np.complex128):
         # only calculate the translations when they are needed
         self.translations = None
+        self.no_solid_units = 4
         
         self.unitcell_size = unitcell_size
         self.det_shape     = det_shape

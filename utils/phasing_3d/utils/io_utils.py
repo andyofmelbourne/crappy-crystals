@@ -1,3 +1,11 @@
+#!/usr/bin/env python
+
+# for python 2 / 3 compatibility
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+
 import numpy as np
 import sys
 
@@ -269,5 +277,5 @@ def if_exists_del(fnam):
     # see if it exists and if so delete it 
     # (probably dangerous but otherwise this gets really anoying for debuging)
     if os.path.exists(fnam):
-        print '\n', fnam ,'file already exists, deleting the old one and making a new one'
+        print('\n', fnam ,'file already exists, deleting the old one and making a new one')
         os.remove(fnam)

@@ -131,11 +131,11 @@ def generate_diff(solid_unit, unit_cell, N, sigma, **params):
         'unit_cell' : numpy.ndarray, complex
             the real-space unit-cell function in the field-of-view
         
-        'diffuse_weighting' : numpy.ndarray, float
-            (1 - exp) 
-        
         'Bragg_weighting' : numpy.ndarray, float
-            N * exp * lattice
+            N * lattice * exp
+            
+        'diffuse_weighting' : numpy.ndarray, float
+            (1 - exp)
         
         'sym' : class object 
             an object for performing symmetry operations on the solid unit
@@ -180,17 +180,17 @@ def generate_diff(solid_unit, unit_cell, N, sigma, **params):
     
     # calculate the Bragg and diffuse scattering
     ############################################
-    B      = Bw * np.abs(np.sum(modes, axis=0)**2)
+    B      = Bw * np.abs(np.sum(modes, axis=0))**2
     D      = Dw * np.sum(np.abs(modes)**2, axis=0)
     
     if io_utils.isValid('turn_off_bragg', params) :
         print('\nExluding Bragg peaks')
-        B  = 0 
-        Bw = 0
-    elif io_utils.isValid('turn_off_diffuse', params) :
+        B.fill(0) 
+        Bw.fill(0)
+    if io_utils.isValid('turn_off_diffuse', params) :
         print('\nExluding diffuse scattering')
-        D  = 0
-        Dw = 0
+        D.fill(0)
+        Dw.fill(0)
     
     diff = B + D
     
@@ -249,5 +249,7 @@ def generate_diff(solid_unit, unit_cell, N, sigma, **params):
     info['crystal']    = crystal_ar
     info['unit_cell']  = unit_cell_ar
     info['sym']        = sym_ops
+    info['Bragg_weighting']   = Bw
+    info['diffuse_weighting'] = Dw
     
     return diff, info
