@@ -75,17 +75,18 @@ if __name__ == '__main__':
     #####################
     if params['solid_unit'] == 'duck':
         duck       = duck_3D.make_3D_duck(shape = params['shape'])
-        solid_unit = np.zeros(params['detector'], dtype=np.complex)
-        solid_unit[:duck.shape[0], :duck.shape[1], :duck.shape[2]] = duck
 
         # flip the solid unit axes
         if 'flip' in params.keys():
             flip = params['flip']
-            solid_unit = solid_unit[::flip[0], ::flip[1], ::flip[2]]
+            duck = duck[::flip[0], ::flip[1], ::flip[2]].copy()
         
         # transpose the solid unit in the unit cell
         if 'transpose' in params.keys():
-            solid_unit = np.transpose(solid_unit, params['transpose'])
+            duck = np.transpose(duck, params['transpose']).copy()
+        
+        solid_unit = np.zeros(params['detector'], dtype=np.complex)
+        solid_unit[:duck.shape[0], :duck.shape[1], :duck.shape[2]] = duck
         
         # position the solid unit in the unit cell
         solid_unit = np.roll(solid_unit, params['position'][0], 0)
@@ -111,7 +112,7 @@ if __name__ == '__main__':
                                
     # output
     ########
-    outputdir = os.path.split(args.filename)[0]
+    outputdir = os.path.split(os.path.abspath(args.filename))[0]
 
     # mkdir if it does not exist
     if not os.path.exists(outputdir):

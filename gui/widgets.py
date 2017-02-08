@@ -602,19 +602,23 @@ class Forward_model_widget(QtGui.QWidget):
 
             # real-space crystal view 
             #########################
+            #cryst = self.f['/forward_model/solid_unit'][()].real
             cryst = self.f[self.crystal_path][()].real
-            cryst = np.fft.fftshift(cryst)
+            #cryst = np.fft.fftshift(cryst)
             # add 10 pix padding
-            padd = np.zeros((cryst.shape[1], 10), dtype=cryst.real.dtype)
+            padd = np.zeros((10, cryst.shape[0]), dtype=cryst.real.dtype)
             t = (np.sum(cryst,axis=0), padd, np.sum(cryst,axis=1), padd, np.sum(cryst,axis=2))
-            t = np.concatenate(t, axis=1).T
+            #cryst = reduce(np.multiply.outer, [np.ones((128,)), np.ones((128,)),np.arange(128)])
+            t = (np.sum(cryst,axis=0), padd, np.sum(cryst,axis=1), padd, np.sum(cryst,axis=2))
+            t = np.concatenate(t, axis=0)
             
             # diffraction volume view 
             #########################
             diff_h5 = self.f[self.diff_path]
-            diff = [np.fft.fftshift(diff_h5[0]), np.fft.fftshift(diff_h5[:, 0, :]), np.fft.fftshift(diff_h5[:, :, 0])]
+            
+            diff = [np.fft.fftshift(diff_h5[0])[:, ::-1], np.fft.fftshift(diff_h5[:, 0, :])[:,::-1], np.fft.fftshift(diff_h5[:, :, 0])[:,::-1]]
             tt = (diff[0], padd, diff[1], padd, diff[2])
-            tt = np.concatenate(tt, axis=1).T**0.2
+            tt = np.concatenate(tt, axis=0)**0.2
              
             if init is False :
                 print('updating image, init = False')

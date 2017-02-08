@@ -76,9 +76,9 @@ def make_3D_duck(shape = (12, 25, 30)):
         duck3d[z, :, :] = circle(rs[z]) * duck
     
     # zero the edges
-    duck3d[0, :, :] = 0
-    duck3d[:, 0, :] = 0
-    duck3d[:, :, 0] = 0
+    #duck3d[0, :, :] = 0
+    #duck3d[:, 0, :] = 0
+    #duck3d[:, :, 0] = 0
     return duck3d
 
         

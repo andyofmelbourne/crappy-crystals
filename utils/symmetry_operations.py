@@ -269,6 +269,7 @@ class P212121():
                     #print(i,j,k, shift, index)
                     C += multiroll_nowrap(U, shift, y = t)
         
+        # re-fftshift them
         C = np.fft.ifftshift(C)
         
         if return_unit :
