@@ -486,23 +486,30 @@ class Mapper_ellipse():
         
         # propagate
         out = np.fft.ifftn(out)
+        self.solid_unit_temp = out.copy()
 
         # finite support
+        print('support projection:')
         if self.voxel_number :
+            print('voxel number:')
             if self.overlap == 'unit_cell' :
                 self.voxel_support = choose_N_highest_pixels( (out * out.conj()).real, self.voxel_number, \
                                      support = self.support, mapper = self.sym_ops.solid_syms_real)
+                print('checking for unit_cell overlap')
             elif self.overlap == 'crystal' :
                 # try using the crystal mapping instead of the unit-cell mapping
                 self.voxel_support = choose_N_highest_pixels( (out * out.conj()).real.astype(np.float32), self.voxel_number, \
                                      support = self.support, mapper = self.sym_ops.solid_to_crystal_real)
+                print('checking for crystal overlap')
             elif self.overlap is None :
                 # try using the crystal mapping instead of the unit-cell mapping
                 self.voxel_support = choose_N_highest_pixels( (out * out.conj()).real.astype(np.float32), self.voxel_number, \
                                      support = self.support, mapper = None)
+                print('no no-overlap constraint')
             else :
                 raise ValueError("overlap must be one of 'unit_cell', 'crystal' or None")
         
+            print(np.sum(self.voxel_support), 'voxels in support')
         out *= self.voxel_support
 
         # reality
