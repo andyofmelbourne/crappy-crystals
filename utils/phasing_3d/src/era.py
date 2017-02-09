@@ -17,50 +17,33 @@ comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
 
-def ERA(I, iters, **args):
+def ERA(iters, **args):
     """
     Find the phases of 'I' given O using the Error Reduction Algorithm.
     
     Parameters
     ----------
-    I : numpy.ndarray, (N, M, K)
-        Merged diffraction patterns to be phased. 
-    
-        N : the number of pixels along slowest scan axis of the detector
-        M : the number of pixels along slow scan axis of the detector
-        K : the number of pixels along fast scan axis of the detector
-    
     iters : int
         The number of ERA iterations to perform.
-    
-    O : numpy.ndarray, (N, M, K) 
-        The real-space scattering density of the object such that:
-            I = |F[O]|^2
-        where F[.] is the 3D Fourier transform of '.'.     
-    
-    support : (numpy.ndarray, None or int), (N, M, K)
-        Real-space region where the object function is known to be zero. 
-        If support is an integer then the N most intense pixels will be kept at
-        each iteration.
-    
-    mask : numpy.ndarray, (N, M, K), optional, default (1)
-        The valid detector pixels. Mask[i, j, k] = 1 (or True) when the detector pixel 
-        i, j, k is valid, Mask[i, j, k] = 0 (or False) otherwise.
     
     hardware : ('cpu', 'gpu'), optional, default ('cpu') 
         Choose to run the reconstruction on a single cpu core ('cpu') or a single gpu
         ('gpu'). The numerical results should be identical.
     
-    alpha : float, optional, default (1.0e-10)
-        A floating point number to regularise array division (prevents 1/0 errors).
-    
-    dtype : (None, 'single' or 'double'), optional, default ('single')
-        Determines the numerical precision of the calculation. If dtype==None, then
-        it is determined from the datatype of I.
-
-    Mapper : class, optional, default None
+    mapper : object, optional, default (phasing_3d.src.mappers.Mapper)
         A mapping class that provides the methods supplied by:
             phasing_3d.src.mappers.Mapper
+        If no mapper is supplied then the (above) defualt is used and 'args' are passed
+        to this mapper for initialisation.
+        Set the Mapper for the single mode (default)
+        ---------------------------------------
+        this guy is responsible for doing:
+          I     = mapper.Imap(modes)   # mapping the modes to the intensity
+          modes = mapper.Pmod(modes)   # applying the data projection to the modes
+          modes = mapper.Psup(modes)   # applying the support projection to the modes
+          O     = mapper.object(modes) # the main object of interest
+          dict  = mapper.finish(modes) # add any additional output to the info dict
+        ---------------------------------------
     
     Returns
     -------
@@ -93,71 +76,46 @@ def ERA(I, iters, **args):
     Examples 
     --------
     """
-    # set the real and complex data precision
-    # ---------------------------------------
-    if 'dtype' not in args.keys() :
-        dtype   = I.dtype
-        c_dtype = (I[0,0,0] + 1J * I[0, 0, 0]).dtype
-    
-    elif args['dtype'] == 'single':
-        dtype   = np.float32
-        c_dtype = np.complex64
-
-    elif args['dtype'] == 'double':
-        dtype   = np.float64
-        c_dtype = np.complex128
-
-    args['dtype']   = dtype
-    args['c_dtype'] = c_dtype
-
-    if isValid('Mapper', args) : 
-        Mapper = args['Mapper']
+    # set the mapper if it has not been provided
+    if isValid('mapper', args) : 
+        mapper = args['mapper']
 
     elif isValid('hardware', args) and args['hardware'] == 'gpu':
         from mappers_gpu import Mapper 
+        mapper = Mapper(**args)
     
     else :
         print('using default cpu mapper')
         from mappers import Mapper 
+        mapper = Mapper(**args)
     
     eMods     = []
     eCons     = []
 
-    # Set the Mapper for the single mode (default)
-    # ---------------------------------------
-    # this guy is responsible for doing:
-    #   I     = mapper.Imap(modes)   # mapping the modes to the intensity
-    #   modes = mapper.Pmod(modes)   # applying the data projection to the modes
-    #   modes = mapper.Psup(modes)   # applying the support projection to the modes
-    #   O     = mapper.object(modes) # the main object of interest
-    #   dict  = mapper.finish(modes) # add any additional output to the info dict
-    # ---------------------------------------
-    mapper = Mapper(I, **args)
     modes  = mapper.modes
 
     if iters > 0 and rank == 0 :
         print('\n\nalgrithm progress iteration convergence modulus error')
     
     for i in range(iters) :
-        modes0 = modes.copy()
+        O0 = mapper.O.copy()
         
         # modulus projection 
         # ------------------
         modes = mapper.Pmod(modes)
-
-        modes1 = modes.copy()
         
         # support projection 
         # ------------------
         modes = mapper.Psup(modes)
         
         # metrics
-        #modes1 -= modes0
         #eMod    = mapper.l2norm(modes1, modes0)
-        eMod    = mapper.Emod(modes)
+        #eMod    = mapper.Emod(modes)
+        eMod    = mapper.eMod
+        #eMod = 0
         
-        modes0 -= modes
-        eCon    = mapper.l2norm(modes0, modes)
+        dO = mapper.O - O0
+        eCon    = mapper.l2norm(dO, O0)
         
         if rank == 0 : update_progress(i / max(1.0, float(iters-1)), 'ERA', i, eCon, eMod )
         

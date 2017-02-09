@@ -20,6 +20,7 @@ import numpy as np
 import h5py 
 import argparse
 import os, sys
+import re
 
 # import python modules using the relative directory 
 # locations this way the repository can be anywhere 
@@ -30,11 +31,65 @@ sys.path.append(os.path.join(root, 'utils'))
 import io_utils
 import duck_3D
 import forward_sim
+import phasing_3d
+import maps
 
-def parse_cmdline_args(default_config='phase.ini'):
+def config_iters_to_alg_num(string):
+    # split a string like '100ERA 200DM 50ERA' with the numbers
+    steps = re.split('(\d+)', string)   # ['', '100', 'ERA ', '200', 'DM ', '50', 'ERA']
+    
+    # get rid of empty strings
+    steps = [s for s in steps if len(s)>0] # ['100', 'ERA ', '200', 'DM ', '50', 'ERA']
+    
+    # pair alg and iters
+    # [['ERA', 100], ['DM', 200], ['ERA', 50]]
+    alg_iters = [ [steps[i+1].strip(), int(steps[i])] for i in range(0, len(steps), 2)]
+    return alg_iters
+
+def phase(mapper, iters_str = '100DM 100ERA'):
+    """
+    phase a crappy crystal diffraction volume
+    
+    Parameters
+    ----------
+    mapper : object
+        A class object that can be used by 3D-phasing, which
+        requires the following methods:
+            I     = mapper.Imap(modes)   # mapping the modes to the intensity
+            modes = mapper.Pmod(modes)   # applying the data projection to the modes
+            modes = mapper.Psup(modes)   # applying the support projection to the modes
+            O     = mapper.object(modes) # the main object of interest
+            dict  = mapper.finish(modes) # add any additional output to the info dict
+    
+    Keyword Arguments
+    -----------------
+    iters_str : str, optional, default ('100DM 100ERA')
+        supported iteration strings, in general it is '[number][alg][space]'
+        [N]DM [N]ERA 1cheshire
+    """
+    alg_iters = config_iters_to_alg_num(iters_str)
+    
+    eMod = []
+    eCon = []
+    for alg, iters in alg_iters :
+        
+        print(alg, iters)
+        
+        if alg == 'ERA':
+           O, info = phasing_3d.ERA(iters, mapper = mapper)
+         
+        if alg == 'DM':
+           O, info = phasing_3d.DM(iters, mapper = mapper)
+         
+        eMod += info['eMod']
+        eCon += info['eCon']
+    
+    return O, mapper, eMod, eCon, info
+
+def parse_cmdline_args(default_config='phase_new.ini'):
     parser = argparse.ArgumentParser(description="phase a crappy crystal from it's diffraction intensity. The results are output into a .h5 file.")
     parser.add_argument('-f', '--filename', type=str, \
-                        help="file name of the *.h5 file to edit / create")
+                        help="file name of the output *.h5 file to edit / create")
     parser.add_argument('-c', '--config', type=str, \
                         help="file name of the configuration file")
     
@@ -56,19 +111,54 @@ def parse_cmdline_args(default_config='phase.ini'):
     
     params = io_utils.parse_parameters(config)[default_config[:-4]]
     
+    # check that the output file was specified
+    ################################################
+    if args.filename is None and params['output_file'] is not None :
+        fnam = params['output_file']
+        args.filename = fnam
+    
+    if args.filename is None :
+        raise ValueError('output_file in the ini file is not valid, or the filename was not specified on the command line')
+    
     return args, params
 
 
 if __name__ == '__main__':
     args, params = parse_cmdline_args()
+    
+    # make the input
+    ################
+    if params['input_file'] is None :
+        f = h5py.File(args.filename)
 
-    # check that the output file was specified
-    ##########################################
-    if args.filename is not None :
-        fnam = args.filename
-    elif params['output_file'] is not None :
-        fnam = params['output_file']
+    I = f[params['data']][()]
+    
+    if params['solid_unit'] is None :
+        solid_unit = None
     else :
-        raise ValueError('output_file in the ini file is not valid, or the filename was not specified on the command line')
+        print('loading solid_unit from file...')
+        solid_unit = f[params['solid_unit']][()]
+    
+    if params['mask'] is None :
+        mask = None
+    else :
+        mask = f[params['mask']][()]
 
-    # 
+    # make the mapper
+    #################
+    mapper = maps.Mapper_ellipse(f[params['data']][()], 
+                                 Bragg_weighting   = f[params['bragg_weighting']][()], 
+                                 diffuse_weighting = f[params['diffuse_weighting']][()], 
+                                 solid_unit        = solid_unit,
+                                 voxels            = params['voxels'],
+                                 overlap           = params['overlap'],
+                                 unit_cell         = params['unit_cell'],
+                                 space_group       = params['space_group'],
+                                 alpha             = params['alpha'],
+                                 dtype             = params['dtype']
+                                 )
+    f.close()
+
+    # phase
+    #######
+    O, mapper, eMod, eCon, info = phase(mapper, params['iters'])

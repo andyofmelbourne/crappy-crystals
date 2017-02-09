@@ -12,7 +12,7 @@ except NameError :
     pass
 
 import numpy as np
-import sys
+import sys, os
 from itertools import product
 from functools import reduce
 
@@ -22,7 +22,7 @@ import add_noise_3d
 import io_utils
 
 import pyximport; pyximport.install()
-from ellipse_2D_cython import project_2D_Ellipse_cython
+from ellipse_2D_cython import project_2D_Ellipse_arrays_cython
 
 import phasing_3d
 from phasing_3d.src.mappers import Modes
@@ -30,7 +30,6 @@ from phasing_3d.src.mappers import isValid
 
 
 def get_sym_ops(space_group, unit_cell, det_shape):
-
     if space_group == 'P1':
         print('\ncrystal space group: P1')
         sym_ops = \
@@ -295,27 +294,18 @@ class Mapper_ellipse():
             floating point offset to prevent divide by zeros: a / (b + alpha)
         
         dtype : np.dtype, optional, default (np.float64)
-        
-        c_dtype : np.dtype, optional, default (np.complex128)
-        
-        turn_off_bragg : bool, optional, default (False)
-            If True then exclude the Bragg peaks from the diffraction volume
-        
-        turn_off_diffuse : bool, optional, default (False)
-            If True then exclude the diffuse scatter from the diffraction volume
+            the complex data type is inferred from this
         """
         # dtype
         #-----------------------------------------------
         if isValid('dtype', args) :
             dtype = args['dtype']
+            a       = np.array([1], dtype=dtype)
+            c_dtype = np.array(a+1J).dtype
         else :
-            dtype = np.float64
-        
-        if isValid('c_dtype', args) :
-            c_dtype = args['c_dtype']
-        else :
+            dtype   = np.float64
             c_dtype = np.complex128
-
+        
         # initialise the object
         #-----------------------------------------------
         if isValid('solid_unit', args):
@@ -323,6 +313,9 @@ class Mapper_ellipse():
         else :
             print('initialising object with random numbers')
             O = np.random.random(I.shape).astype(c_dtype)
+            print(O.shape)
+        
+        self.O = O
         
         # initialise the mask, alpha value and amp
         #-----------------------------------------------
@@ -365,7 +358,7 @@ class Mapper_ellipse():
         if isValid('sym', args):
             self.sym_ops = args['sym'] 
         else :
-            self.sym_ops = get_sym_ops(args['space_group'], args['unit_cell'], O)
+            self.sym_ops = get_sym_ops(args['space_group'], args['unit_cell'], O.shape)
         
         # diffuse and Bragg weightings
         #-----------------------------
@@ -377,9 +370,11 @@ class Mapper_ellipse():
         self.modes = np.zeros( (2 * self.sym_ops.no_solid_units,) + O.shape, O.dtype)
         
         # diffuse terms
+        #self.modes[:self.modes.shape[0]//2] = self.sym_ops.solid_syms_Fourier(O, apply_translation = False, syms = self.modes[:self.modes.shape[0]//2])
         self.modes[:self.modes.shape[0]//2] = self.sym_ops.solid_syms_Fourier(O, apply_translation = False)
         
         # unit cell terms
+        #self.modes[self.modes.shape[0]//2:] = self.sym_ops.solid_syms_Fourier(O, apply_translation = True, syms = self.modes[self.modes.shape[0]//2:])
         self.modes[self.modes.shape[0]//2:] = self.sym_ops.solid_syms_Fourier(O, apply_translation = True)
         
         print('eMod(modes0):', self.Emod(self.modes))
@@ -398,7 +393,7 @@ class Mapper_ellipse():
         #-----------------------------------------------
         
         # floating point tolerance for 1/x (log10)  
-        tol = 15. #1.0e+15
+        tol = 10. #1.0e+15
         
         # check for numbers close to infinity in sqrt(I / self.diffuse_weighting)
         m = (self.diffuse_weighting <= 10.**(-tol)) + (I <= 10.**(-tol))
@@ -456,6 +451,8 @@ class Mapper_ellipse():
         
         print('Checking that (x/e0)**2 + (y/e1)**2 == 1?')
         print('np.sum(((x/e0)**2 + (y/e1)**2 - 1)**2):', np.sum((iden - 1)**2))
+        self.e0_inf = self.e0_inf.astype(np.uint8)
+        self.e1_inf = self.e1_inf.astype(np.uint8)
          
     def object(self, modes):
         out = np.fft.ifftn(modes[0])
@@ -476,52 +473,48 @@ class Mapper_ellipse():
         # diffuse terms: unflip the modes
         out[: modes.shape[0]//2] = \
                 self.sym_ops.unflip_modes_Fourier(modes[: modes.shape[0]//2], apply_translation = False)
-
+        
         # unit_cell terms: unflip the modes
         out[modes.shape[0]//2 :] = \
                 self.sym_ops.unflip_modes_Fourier(modes[modes.shape[0]//2 :], apply_translation = True)
-
+        
         # average 
         out = np.mean(out, axis=0)
         
         # propagate
         out = np.fft.ifftn(out)
-        self.solid_unit_temp = out.copy()
 
         # finite support
-        print('support projection:')
         if self.voxel_number :
-            print('voxel number:')
             if self.overlap == 'unit_cell' :
                 self.voxel_support = choose_N_highest_pixels( (out * out.conj()).real, self.voxel_number, \
                                      support = self.support, mapper = self.sym_ops.solid_syms_real)
-                print('checking for unit_cell overlap')
             elif self.overlap == 'crystal' :
                 # try using the crystal mapping instead of the unit-cell mapping
                 self.voxel_support = choose_N_highest_pixels( (out * out.conj()).real.astype(np.float32), self.voxel_number, \
                                      support = self.support, mapper = self.sym_ops.solid_to_crystal_real)
-                print('checking for crystal overlap')
             elif self.overlap is None :
                 # try using the crystal mapping instead of the unit-cell mapping
                 self.voxel_support = choose_N_highest_pixels( (out * out.conj()).real.astype(np.float32), self.voxel_number, \
                                      support = self.support, mapper = None)
-                print('no no-overlap constraint')
             else :
                 raise ValueError("overlap must be one of 'unit_cell', 'crystal' or None")
         
-            print(np.sum(self.voxel_support), 'voxels in support')
         out *= self.voxel_support
 
         # reality
         out.imag = 0
+        
+        # store the latest guess for the object
+        self.O = out.copy()
         
         # propagate
         out = np.fft.fftn(out)
         
         # broadcast
         modes_out = np.empty_like(self.modes)
-        modes_out[: modes_out.shape[0]//2] = self.sym_ops.solid_syms_Fourier(out, apply_translation=False)
-        modes_out[modes_out.shape[0]//2 :] = self.sym_ops.solid_syms_Fourier(out, apply_translation=True)
+        modes_out[: modes_out.shape[0]//2] = self.sym_ops.solid_syms_Fourier(out, apply_translation=False, syms=modes_out[: modes_out.shape[0]//2])
+        modes_out[modes_out.shape[0]//2 :] = self.sym_ops.solid_syms_Fourier(out, apply_translation=True,  syms=modes_out[modes_out.shape[0]//2 :])
 
         self.iters += 1
         
@@ -529,14 +522,9 @@ class Mapper_ellipse():
         return modes_out
 
     def Pmod(self, modes):
-        #return modes.copy()
-        #out = modes.copy()
-        #M   = self.Imap(out)
-        #out = pmod_naive(self.amp, M, modes, self.mask, alpha = self.alpha)
-        ###################################
         U  = modes[modes.shape[0]//2 :]
         D  = modes[: modes.shape[0]//2]
-
+        
         # make x
         #-----------------------------------------------
         x = np.sqrt(np.sum( (D * D.conj()).real, axis=0))
@@ -545,33 +533,20 @@ class Mapper_ellipse():
         #-----------------------------------------------
         # rotate the unit cell modes
         # eg. for N = 2 : Ut = np.array([[1., 1.], [-1., 1.]], dtype=np.float64) / np.sqrt(2.)
-
+        
         Ut = make_unitary_transform(modes.shape[0]//2)
-
+        
         u = np.dot(Ut, U.reshape((U.shape[0], -1)))
         
         y = np.abs(np.sum(U, axis=0) / np.sqrt(U.shape[0]))
         
-        tol = 1.0e-10
         # project onto xp yp
         #-----------------------------------------------
-        #assert np.all(self.e0[~self.e0_inf] > 0)
-        #assert np.all(self.e1[~self.e1_inf] > 0)
-        xp = np.empty_like(x)
-        yp = np.empty_like(x)
-        it = np.nditer([self.e0, self.e1, x, y, self.e0_inf, self.e1_inf, xp, yp],
-                        op_flags = [['readonly'], ['readonly'], ['readonly'], ['readonly'],
-                                    ['readonly'],['readonly'],['writeonly', 'no_broadcast'],
-                                    ['writeonly', 'no_broadcast']])
-        for e0, e1, xi, yi, e0_inf, e1_inf, uu, vv in it:
-            uu[...], vv[...] = project_2D_Ellipse_cython(e0, e1, xi, yi, e0_inf, e1_inf)
-        
-            # check
-            if (not e0_inf) and (not e1_inf) :
-                err = abs((uu[...] / e0)**2 + (vv[...] / e1)**2 - 1.)
-                if err > tol :
-                    print('e0, e1, xi, yi, xp, yp, err:', e0, e1, xi, yi, uu[...], vv[...], err)
-
+        xp, yp = project_2D_Ellipse_arrays_cython(self.e0.ravel(), self.e1.ravel(), 
+                                                  x.ravel(), y.ravel(), 
+                                                  self.e0_inf.ravel(), self.e1_inf.ravel())
+        xp = xp.reshape(self.e0.shape)
+        yp = yp.reshape(self.e0.shape)
         
         # xp yp --> modes
         #-----------------------------------------------
@@ -584,12 +559,15 @@ class Mapper_ellipse():
         
         # un rotate the y's
         out[modes.shape[0]//2 :] = np.dot(Ut.T, u).reshape(U.shape)
-        # check
-        #print(' sum | sqrt(I) - sqrt(Imap) | : ', self.Emod(out))
-        #print('Pmod -->  sum | modes - out | : ', np.sum( np.abs(modes - out) ))
         
+        # store the latest eMod
+        delta     = modes[0] - out[0]
+        self.eMod = self.l2norm(delta, out[0])
+        # check
+        print(' sum | sqrt(I) - sqrt(Imap) | : ', self.Emod(out))
+        #print('Pmod -->  sum | modes - out | : ', np.sum( np.abs(modes - out) ))
         return out
-    
+
     def Emod(self, modes):
         M         = self.Imap(modes)
         eMod      = np.sum( self.mask * ( np.sqrt(M) - self.amp )**2 )

@@ -11,6 +11,8 @@ try :
 except NameError :
     pass
 
+import phasing_3d
+
 def config_iters_to_alg_num(string):
     # split a string like '100ERA 200DM 50ERA' with the numbers
     steps = re.split('(\d+)', string)   # ['', '100', 'ERA ', '200', 'DM ', '50', 'ERA']
@@ -23,15 +25,12 @@ def config_iters_to_alg_num(string):
     alg_iters = [ [steps[i+1].strip(), int(steps[i])] for i in range(0, len(steps), 2)]
     return alg_iters
 
-def phase(I, mapper):
+def phase(mapper, iters_str = '100DM 100ERA'):
     """
     phase a crappy crystal diffraction volume
     
     Parameters
     ----------
-    I : numpy.ndarray, float
-        The 3D diffraction volume
-    
     mapper : object
         A class object that can be used by 3D-phasing, which
         requires the following methods:
@@ -43,8 +42,25 @@ def phase(I, mapper):
     
     Keyword Arguments
     -----------------
-    modes : numpy.ndarray, optional, default (None)
-    
-    iterations : str, optional, default ('100DM 100ERA')
+    iters_str : str, optional, default ('100DM 100ERA')
+        supported iteration strings, in general it is '[number][alg][space]'
+        [N]DM [N]ERA 1cheshire
     """
-
+    alg_iters = config_iters_to_alg_num(iters_str)
+    
+    eMod = []
+    eCon = []
+    for alg, iters in alg_iters :
+        
+        print alg, iters
+        
+        if alg == 'ERA':
+           O, info = phasing_3d.ERA(iters, mapper)
+         
+        if alg == 'DM':
+           O, info = phasing_3d.DM(iters, mapper)
+         
+        eMod += info['eMod']
+        eCon += info['eCon']
+    
+    return O, mapper, eMod, eCon, info
