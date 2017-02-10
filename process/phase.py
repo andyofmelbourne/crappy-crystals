@@ -1,21 +1,38 @@
+#!/usr/bin/env python
+
+# for python 2 / 3 compatibility
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+
+try :
+    range = xrange
+except NameError :
+    pass
+
+try :
+    import ConfigParser as configparser 
+except ImportError :
+    import configparser 
+
 import numpy as np
-import ConfigParser
-import time
-import re
-import copy
-
-import phasing_3d
-
-# insert the directory in which this file is being executed from
-# into sys.path
+import h5py 
+import argparse
 import os, sys
-sys.path.append(os.path.abspath(__file__)[:-len(__file__)])
+import re
 
-import crappy_crystals
-import crappy_crystals.utils
-from crappy_crystals import utils
-from crappy_crystals.phasing.maps import Mapper_naive, Mapper_ellipse
+# import python modules using the relative directory 
+# locations this way the repository can be anywhere 
+root = os.path.split(os.path.abspath(__file__))[0]
+root = os.path.split(root)[0]
+sys.path.append(os.path.join(root, 'utils'))
 
+import io_utils
+import duck_3D
+import forward_sim
+import phasing_3d
+import maps
 
 def config_iters_to_alg_num(string):
     # split a string like '100ERA 200DM 50ERA' with the numbers
@@ -29,97 +46,185 @@ def config_iters_to_alg_num(string):
     alg_iters = [ [steps[i+1].strip(), int(steps[i])] for i in range(0, len(steps), 2)]
     return alg_iters
 
-def phase(I, support, params, good_pix = None, sample_known = None):
-    d   = {'eMod' : [],         \
-           'eCon' : [],         \
-           'O'    : None,       \
-           'background' : None, \
-           'B_rav' : None, \
-           'support' : None     \
-            }
-    out = []
-
-    # move all of the phasing params to the top level
-    for k in params.keys():
-        if k != 'phasing_parameters':
-            params['phasing_parameters'][k] = params[k]
-
-    params['phasing_parameters']['O'] = None
+def phase(mapper, iters_str = '100DM 100ERA'):
+    """
+    phase a crappy crystal diffraction volume
     
-    params['phasing_parameters']['mask'] = good_pix
+    Parameters
+    ----------
+    mapper : object
+        A class object that can be used by 3D-phasing, which
+        requires the following methods:
+            I     = mapper.Imap(modes)   # mapping the modes to the intensity
+            modes = mapper.Pmod(modes)   # applying the data projection to the modes
+            modes = mapper.Psup(modes)   # applying the support projection to the modes
+            O     = mapper.object(modes) # the main object of interest
+            dict  = mapper.finish(modes) # add any additional output to the info dict
     
-    if params['phasing_parameters']['support'] is None :
-        params['phasing_parameters']['support'] = support
-
+    Keyword Arguments
+    -----------------
+    iters_str : str, optional, default ('100DM 100ERA')
+        supported iteration strings, in general it is '[number][alg][space]'
+        [N]DM [N]ERA 1cheshire
+    """
+    alg_iters = config_iters_to_alg_num(iters_str)
     
-    # fall-back
-    params['phasing_parameters']['Mapper'] = Mapper_naive
-
-    if params['phasing']['mapper'] == 'naive' :
-        if params['phasing_parameters']['hardware'] == 'gpu':
-            from crappy_crystals.gpu.phasing.maps import Mapper_naive as Mapper_naive_gpu 
-            params['phasing_parameters']['Mapper'] = Mapper_naive_gpu
-        else :
-            params['phasing_parameters']['Mapper'] = Mapper_naive
-
-    elif params['phasing']['mapper'] == 'ellipse' :
-        params['phasing_parameters']['Mapper'] = Mapper_ellipse
-
-    params0 = copy.deepcopy(params)
-    
-    alg_iters = config_iters_to_alg_num(params['phasing']['iters'])
-    
-    # Repeats
-    #---------------------------------------------
-    for j in range(params['phasing']['repeats']):
-        out.append(copy.deepcopy(d))
-        params = copy.deepcopy(params0)
+    eMod = []
+    eCon = []
+    O = mapper.O
+    for alg, iters in alg_iters :
         
-        # for testing
-        # params['phasing_parameters']['O'] = np.roll(sample_known, -4, 1) #* np.random.random(sample_known.shape)
-        for alg, iters in alg_iters :
-            
-            if alg == 'ERA':
-               O, info = phasing_3d.ERA(I, iters, **params['phasing_parameters'])
-             
-            if alg == 'DM':
-               O, info = phasing_3d.DM(I,  iters, **params['phasing_parameters'])
-             
-            if alg == 'cheshireScan':
-               mapper  = params['phasing_parameters']['Mapper'](I, **params['phasing_parameters'])
-               O, info = mapper.scans_cheshire(O)
-            
-            out[j]['O']           = params['phasing_parameters']['O']          = O
-            out[j]['support']     = params['phasing_parameters']['support']    = info['support']
-            out[j]['eMod']       += info['eMod']
-            out[j]['eCon']       += info['eCon']
-            
-            if 'background' in info.keys():
-                out[j]['background']  = params['phasing_parameters']['background'] = info['background'] * good_pix
-                out[j]['B_rav']       = info['r_av']
+        print(alg, iters)
+        
+        if alg == 'ERA':
+           O, info = phasing_3d.ERA(iters, mapper = mapper)
+         
+        if alg == 'DM':
+           O, info = phasing_3d.DM(iters, mapper = mapper)
+        
+        if alg == 'cheshire':
+           O, info = mapper.scans_cheshire(O, steps=[4,4,4])
+         
+        eMod += info['eMod']
+        eCon += info['eCon']
     
-        out[j]['I'] = info['I']
-        out[j]['eMod'] = np.array(out[j]['eMod'])
-        out[j]['eCon'] = np.array(out[j]['eCon'])
-    return out
+    return O, mapper, eMod, eCon, info
+
+def parse_cmdline_args(default_config='phase.ini'):
+    parser = argparse.ArgumentParser(description="phase a crappy crystal from it's diffraction intensity. The results are output into a .h5 file.")
+    parser.add_argument('-f', '--filename', type=str, \
+                        help="file name of the output *.h5 file to edit / create")
+    parser.add_argument('-c', '--config', type=str, \
+                        help="file name of the configuration file")
+    
+    args = parser.parse_args()
+    
+    # if config is non then read the default from the *.h5 dir
+    if args.config is None :
+        args.config = os.path.join(os.path.split(args.filename)[0], default_config)
+        if not os.path.exists(args.config):
+            args.config = '../process/' + default_config
+    
+    # check that args.config exists
+    if not os.path.exists(args.config):
+        raise NameError('config file does not exist: ' + args.config)
+    
+    # process config file
+    config = configparser.ConfigParser()
+    config.read(args.config)
+    
+    params = io_utils.parse_parameters(config)[default_config[:-4]]
+    
+    # check that the output file was specified
+    ################################################
+    if args.filename is None and params['output_file'] is not None :
+        fnam = params['output_file']
+        args.filename = fnam
+    
+    if args.filename is None :
+        raise ValueError('output_file in the ini file is not valid, or the filename was not specified on the command line')
+    
+    return args, params
 
 
-if __name__ == "__main__":
-    args = utils.io_utils.parse_cmdline_args_phasing()
+if __name__ == '__main__':
+    args, params = parse_cmdline_args()
     
-    # read the h5 file
-    kwargs = utils.io_utils.read_input_output_h5(args.input)
-    
-    print kwargs.keys()
-    out = phase(kwargs['data'], kwargs['sample_support'], kwargs['config_file'], \
-                        good_pix = kwargs['good_pix'], sample_known = kwargs['solid_unit'])
-    
-    out = out[0]
+    # make the input
+    ################
+    if params['input_file'] is None :
+        f = h5py.File(args.filename)
 
-    # write the h5 file 
-    fnam = os.path.join(kwargs['config_file']['output']['path'], 'output.h5')
-    utils.io_utils.write_input_output_h5(fnam, data = kwargs['data'], \
-            data_retrieved = out['I'], sample_support = kwargs['sample_support'], \
-            sample_support_retrieved = out['support'], good_pix = kwargs['good_pix'], \
-            solid_unit = kwargs['solid_unit'], solid_unit_retrieved = out['O'], modulus_error = out['eMod'], \
-            fidelity_error = out['eCon'], config_file = kwargs['config_file_name'], B_rav = out['B_rav'])
+    I = f[params['data']][()]
+    
+    if params['solid_unit'] is None :
+        solid_unit = None
+    else :
+        print('loading solid_unit from file...')
+        solid_unit = f[params['solid_unit']][()]
+    
+    if params['mask'] is None :
+        mask = None
+    else :
+        mask = f[params['mask']][()]
+    
+    if type(params['voxels']) != int and params['voxels'][0] == '/'  :
+        voxels = f[params['voxels']][()]
+    else :
+        voxels = params['voxels']
+
+    # make the mapper
+    #################
+    mapper = maps.Mapper_ellipse(f[params['data']][()], 
+                                 Bragg_weighting   = f[params['bragg_weighting']][()], 
+                                 diffuse_weighting = f[params['diffuse_weighting']][()], 
+                                 solid_unit        = solid_unit,
+                                 voxels            = voxels,
+                                 overlap           = params['overlap'],
+                                 unit_cell         = params['unit_cell'],
+                                 space_group       = params['space_group'],
+                                 alpha             = params['alpha'],
+                                 dtype             = params['dtype']
+                                 )
+    f.close()
+
+    # phase
+    #######
+    O, mapper, eMod, eCon, info = phase(mapper, params['iters'])
+
+
+    # output
+    ########
+    outputdir = os.path.split(os.path.abspath(args.filename))[0]
+
+    # mkdir if it does not exist
+    if not os.path.exists(outputdir):
+        os.makedirs(outputdir)
+    
+    f = h5py.File(args.filename)
+    
+    group = '/phase'
+    if group not in f:
+        f.create_group(group)
+    
+    # solid unit
+    key = group+'/solid_unit'
+    if key in f :
+        del f[key]
+    f[key] = O
+    
+    # real-space crystal
+    key = group+'/crystal'
+    if key in f :
+        del f[key]
+    f[key] = mapper.sym_ops.solid_to_crystal_real(O)
+
+    del info['eMod']
+    del info['eCon']
+    info['eMod'] = eMod
+    info['eCon'] = eCon
+    # everything else
+    for key, value in info.items():
+        if value is None :
+            continue 
+        
+        h5_key = group+'/'+key
+        if h5_key in f :
+            del f[h5_key]
+        
+        try :
+            print('writing:', h5_key, type(value))
+            f[h5_key] = value
+        
+        except Exception as e :
+            print('could not write:', h5_key, ':', e)
+        
+    f.close() 
+    
+    # copy the config file
+    ######################
+    try :
+        import shutil
+        shutil.copy(args.config, outputdir)
+    except Exception as e :
+        print(e)

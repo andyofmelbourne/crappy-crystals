@@ -61,6 +61,11 @@ class Gui(QtGui.QTabWidget):
         self.tabs.append( widgets.Forward_model_widget(filename) )
         self.addTab(self.tabs[-1], "Forward model")
 
+        # Show phase tab
+        ########################
+        self.tabs.append( widgets.Phase_widget(filename) )
+        self.addTab(self.tabs[-1], "Phase")
+
 def gui(filename):
     signal.signal(signal.SIGINT, signal.SIG_DFL) # allow Control-C
     app = QtGui.QApplication([])

@@ -114,8 +114,8 @@ def ERA(iters, **args):
         eMod    = mapper.eMod
         #eMod = 0
         
-        dO = mapper.O - O0
-        eCon    = mapper.l2norm(dO, O0)
+        dO   = mapper.O - O0
+        eCon = mapper.l2norm(dO, O0)
         
         if rank == 0 : update_progress(i / max(1.0, float(iters-1)), 'ERA', i, eCon, eMod )
         

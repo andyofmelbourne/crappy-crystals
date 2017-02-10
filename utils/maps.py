@@ -427,6 +427,7 @@ class Mapper_ellipse():
         
         # check that self.Imap == I * (x/e_0)**2 + (y/e_1)**2
         # or that (x/e_0)**2 + (y/e_1)**2 = 1
+        """
         U  = self.modes[self.modes.shape[0]//2 :]
         D  = self.modes[: self.modes.shape[0]//2]
         # make x
@@ -449,6 +450,7 @@ class Mapper_ellipse():
         
         print('Checking that (x/e0)**2 + (y/e1)**2 == 1?')
         print('np.sum(((x/e0)**2 + (y/e1)**2 - 1)**2):', np.sum((iden - 1)**2))
+        """
         self.e0_inf = self.e0_inf.astype(np.uint8)
         self.e1_inf = self.e1_inf.astype(np.uint8)
         print('eMod(modes0):', self.Emod(self.modes))
@@ -527,49 +529,59 @@ class Mapper_ellipse():
         
         # make x
         #-----------------------------------------------
-        x = np.sqrt(np.sum( (D * D.conj()).real, axis=0))
+        x = np.sqrt(np.sum( (D * D.conj()).real, axis=0)).ravel()
         
         # make y
         #-----------------------------------------------
         # rotate the unit cell modes
         # eg. for N = 2 : Ut = np.array([[1., 1.], [-1., 1.]], dtype=np.float64) / np.sqrt(2.)
+        # Ut = make_unitary_transform(modes.shape[0]//2)
+        # u = np.dot(Ut, U.reshape((U.shape[0], -1)))
         
-        Ut = make_unitary_transform(modes.shape[0]//2)
+        # actually this is just an fft!
+        # just have to make sure that it is norm preserving
+        #u = (np.fft.fftn(U, axes=(0,))/np.sqrt(U.shape[0])).reshape((U.shape[0], -1))
+        u = (np.fft.fftn(U, axes=(0,))/np.sqrt(U.shape[0]))[0].ravel()
         
-        u = np.dot(Ut, U.reshape((U.shape[0], -1)))
+        y = np.abs(u) # np.abs(np.sum(U, axis=0) / np.sqrt(U.shape[0]))
         
-        y = np.abs(u[0]) # np.abs(np.sum(U, axis=0) / np.sqrt(U.shape[0]))
-        forbidden = (y.ravel() < 1000*self.alpha)
+        # look for forbidden reflections
+        forbidden   = (y < 1000*self.alpha)
         
         # project onto xp yp
         #-----------------------------------------------
         xp, yp = project_2D_Ellipse_arrays_cython(self.e0.ravel(), self.e1.ravel(), 
-                                                  x.ravel(), y.ravel(), 
+                                                  x, y, 
                                                   self.e0_inf.ravel(), self.e1_inf.ravel())
-        xp = xp.reshape(self.e0.shape)
-        #yp = yp.reshape(self.e0.shape)
-        #y  = y.reshape(self.e0.shape)
         
         # xp yp --> modes
         #-----------------------------------------------
+        # d *= xp / x
+        #############
         out = modes.copy()
-        out[: modes.shape[0]//2] *= xp / (x + self.alpha)
+        out[: modes.shape[0]//2] *= (xp / (x + self.alpha)).reshape(D[0].shape)
         
+        # u   *= yp / y
+        # U[0] = u
+        # U    = ifft(U)
+        ################
         # for forbidden reflections be more careful 
-        angle = np.angle(u[0][forbidden])
-        u[0][forbidden] = yp[forbidden] * np.exp(1J * angle)
+        angle = np.angle(u[forbidden])
+        up            = np.empty_like(u)
+        up[forbidden] = yp[forbidden] * np.exp(1J * angle)
         
         # for everything else just scale (this is much faster)
-        u[0][~forbidden] *= (yp[~forbidden] / y.ravel()[~forbidden]).ravel()
+        up[~forbidden] = u[~forbidden] * yp[~forbidden] / y[~forbidden]
         
-        # un rotate the y's
-        out[modes.shape[0]//2 :] = np.dot(Ut.T, u).reshape(U.shape)
+        # un-rotate
+        #out[modes.shape[0]//2 :] = np.sqrt(U.shape[0])*np.fft.ifftn(u, axes=(0,)).reshape(D.shape)
+        out[modes.shape[0]//2 :] += (up - u).reshape(D[0].shape) / np.sqrt(U.shape[0])
         
         # store the latest eMod, but just use one mode to speed this up
         delta     = modes[4] - out[4]
         self.eMod = self.l2norm(delta, out[4])
         # check
-        print(' sum | sqrt(I) - sqrt(Imap) | : ', self.Emod(out))
+        #print(' sum | sqrt(I) - sqrt(Imap) | : ', self.Emod(out))
         #print('Pmod -->  sum | modes - out | : ', np.sum( np.abs(modes - out) ))
         return out
 
@@ -598,8 +610,10 @@ class Mapper_ellipse():
 
     def finish(self, modes):
         out = {}
+        self.modes     = modes
+        self.O         = self.object(modes)
         out['support'] = self.voxel_support
-        out['I']       = self.Imap(modes)
+        out['diff']    = self.Imap(modes)
         return out
 
     def l2norm(self, delta, array0):

@@ -20,7 +20,7 @@ comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
 
-def DM(I, iters, **args):
+def DM(iters, **args):
     """
     Find the phases of 'I' given O using the Error Reduction Algorithm.
     
@@ -135,39 +135,22 @@ def DM(I, iters, **args):
         from dm_gpu import DM_gpu
         return DM_gpu(I, R, P, O, iters, OP_iters, mask, background, method, hardware, alpha, dtype, full_output)
     """
-    # set the real and complex data precision
-    # ---------------------------------------
-    if 'dtype' not in args.keys() :
-        dtype   = I.dtype
-        c_dtype = (I[0,0,0] + 1J * I[0, 0, 0]).dtype
-    
-    elif args['dtype'] == 'single':
-        dtype   = np.float32
-        c_dtype = np.complex64
-
-    elif args['dtype'] == 'double':
-        dtype   = np.float64
-        c_dtype = np.complex128
-
-    args['dtype']   = dtype
-    args['c_dtype'] = c_dtype
-
-    if isValid('Mapper', args) : 
-        print('using user defined mapper')
-        Mapper = args['Mapper']
+    if isValid('mapper', args) : 
+        mapper = args['mapper']
 
     elif isValid('hardware', args) and args['hardware'] == 'gpu':
         print('using gpu mapper')
         from mappers_gpu import Mapper 
+        mapper = Mapper(I, **args)
     
     else :
         print('using default cpu mapper')
         from mappers import Mapper 
+        mapper = Mapper(I, **args)
     
     eMods     = []
     eCons     = []
     
-    mapper = Mapper(I, **args)
     modes  = mapper.modes
     
     modes_sup = mapper.Psup(modes)
@@ -178,7 +161,7 @@ def DM(I, iters, **args):
     for i in range(iters) :
         
         # reference
-        modes0 = modes.copy()
+        O0 = mapper.O.copy()
         
         # update 
         #-------
@@ -186,13 +169,17 @@ def DM(I, iters, **args):
         
         # metrics
         #--------
-        modes0 -= modes
-        eCon    = mapper.l2norm(modes0, modes)
-
+        #modes0 -= modes
+        #eCon    = mapper.l2norm(modes0, modes)
+        
         # f* = Ps f_i = PM (2 Ps f_i - f_i)
         modes_sup = mapper.Psup(modes)
 
-        eMod = mapper.Emod(modes_sup)
+        dO   = mapper.O - O0
+        eCon = mapper.l2norm(dO, O0)
+        
+        #eMod = mapper.Emod(modes_sup)
+        eMod = mapper.eMod
         
         if rank == 0 : era.update_progress(i / max(1.0, float(iters-1)), 'DM', i, eCon, eMod )
         
