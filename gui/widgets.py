@@ -254,47 +254,6 @@ class Show_nd_data_widget(QtGui.QWidget):
         self.show(self.filename, self.name, True)
 
 
-class View_h5_data_widget(QtGui.QWidget):
-    def __init__(self, filename, names = None):
-        super(View_h5_data_widget, self).__init__()
-        
-        self.filename = filename
-        self.names = names
-            
-        self.show_list_widget = Show_h5_list_widget(filename, names = names)
-        self.plot1dWidget = Show_nd_data_widget()
-        
-        # send a signal when an item is clicked
-        self.show_list_widget.listWidget.itemClicked.connect(self.dataset_clicked)
-
-        self.initUI()
-
-    def initUI(self):
-        layout = QtGui.QHBoxLayout()
-        
-        # add the layout to the central widget
-        self.setLayout(layout)
-
-        # add the h5 datasets list
-        layout.addWidget(self.show_list_widget)
-        
-        # add the 1d viewer 
-        layout.addWidget(self.plot1dWidget, stretch=1)
-        
-
-    def dataset_clicked(self, item):
-        name = str(item.text())
-        
-        # close the last image
-        self.plot1dWidget.close()
-        
-        # load the new one
-        self.plot1dWidget.show(self.filename, name)
-        
-    def update(self):
-        self.show_list_widget.update()
-        self.plot1dWidget.update()
-
 
 class Test_run_command_widget(QtGui.QWidget):
     def __init__(self, h5_filename):
@@ -710,26 +669,27 @@ class Phase_widget(QtGui.QWidget):
         self.f = h5py.File(self.filename, 'r')
         print(self.crystal_path, init)
         
+        if init :
+            # crystal
+            frame_plt = pg.PlotItem(title = 'real space crystal projections')
+            self.imageView = pg.ImageView(view = frame_plt)
+            self.imageView.ui.menuBtn.hide()
+            self.imageView.ui.roiBtn.hide()
+            
+            # diff
+            frame_plt2 = pg.PlotItem(title = 'diffraction volume slices')
+            self.imageView2 = pg.ImageView(view = frame_plt2)
+            self.imageView2.ui.menuBtn.hide()
+            self.imageView2.ui.roiBtn.hide()
+            
+            self.im_init = False
+             
+            splitter = QtGui.QSplitter(QtCore.Qt.Vertical)
+            splitter.addWidget(self.imageView)
+            splitter.addWidget(self.imageView2)
+        
         if self.crystal_path in self.f :
             print('making arrays...')
-            if init :
-                # crystal
-                frame_plt = pg.PlotItem(title = 'real space crystal projections')
-                self.imageView = pg.ImageView(view = frame_plt)
-                self.imageView.ui.menuBtn.hide()
-                self.imageView.ui.roiBtn.hide()
-                
-                # diff
-                frame_plt2 = pg.PlotItem(title = 'diffraction volume slices')
-                self.imageView2 = pg.ImageView(view = frame_plt2)
-                self.imageView2.ui.menuBtn.hide()
-                self.imageView2.ui.roiBtn.hide()
-                
-                self.im_init = False
-        
-                splitter = QtGui.QSplitter(QtCore.Qt.Vertical)
-                splitter.addWidget(self.imageView)
-                splitter.addWidget(self.imageView2)
 
             # real-space crystal view 
             #########################

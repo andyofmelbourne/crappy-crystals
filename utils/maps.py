@@ -43,199 +43,6 @@ def get_sym_ops(space_group, unit_cell, det_shape):
     return sym_ops
 
 
-class Mapper_naive():
-
-    def __init__(self, I, **args):
-        """
-        For mapper naive we just have a single object.
-
-        The support projection is:
-            Psup O = F . S . F-1 . O
-
-        And the modulus projection is:
-            Pmod O = O sqrt{ I / M }
-
-        Where M is the forward mapping (self.Imap) of O
-        to the diffraction intensity:
-            M = (1 - gaus) sum_i | O_i |^2 +
-                N * L * gaus * | sum_i O_i |^2 
-
-
-        Parameters
-        ----------
-        I : numpy.ndarray, (N, M, K)
-            Merged diffraction patterns to be phased. 
-        
-            N : the number of pixels along slowest scan axis of the detector
-            M : the number of pixels along slow scan axis of the detector
-            K : the number of pixels along fast scan axis of the detector
-        
-        O : numpy.ndarray, (N, M, K) 
-            The real-space scattering density of the object such that:
-                I = |F[O]|^2
-            where F[.] is the 3D Fourier transform of '.'.     
-        
-        dtype : np.float32 or np.float64
-            Determines the numerical precision of the calculation. 
-
-        c_dtype : np.complex64 or np.complex128
-            Determines the numerical precision of the complex variables. 
-
-        support : (numpy.ndarray, None or int), optional (N, M, K)
-            Real-space region where the object function is known to be zero. 
-            If support is an integer then the N most intense pixels will be kept at
-            each iteration.
-
-        voxel_number : None or int, optional
-            If int, then the voxel number support is used. If support is not None or False
-            then the voxel number support is used within the sample support bounds.
-        
-        mask : numpy.ndarray, (N, M, K), optional, default (1)
-            The valid detector pixels. Mask[i, j, k] = 1 (or True) when the detector pixel 
-            i, j, k is valid, Mask[i, j, k] = 0 (or False) otherwise.
-        
-        alpha : float, optional, default (1.0e-10)
-            A floating point number to regularise array division (prevents 1/0 errors).
-        
-        disorder['sigma'] : float
-            The standard deviation of the isotropic displacement of the solid unit within
-            the crystal.
-
-        detector['shape'] : tupple
-            The shape of the detector (3D).
-
-        crystal['unit_cell'] : tupple
-            The dimensions of the unit cell
-
-        Returns
-        -------
-        O : numpy.ndarray, (U, V, K) 
-            The real-space object function after 'iters' iterations of the ERA algorithm.
-        
-        info : dict
-            contains diagnostics:
-                
-                'I'     : the diffraction pattern corresponding to object above
-                'eMod'  : the modulus error for each iteration:
-                          eMod_i = sqrt( sum(| O_i - Pmod(O_i) |^2) / I )
-                'eCon'  : the convergence error for each iteration:
-                          eCon_i = sqrt( sum(| O_i - O_i-1 |^2) / sum(| O_i |^2) )
-        """
-        print('Hello I am the naive mapper')
-        # dtype
-        #-----------------------------------------------
-        if isValid('dtype', args) :
-            dtype = args['dtype']
-        else :
-            dtype = np.float64
-        
-        if isValid('c_dtype', args) :
-            c_dtype = args['c_dtype']
-        else :
-            c_dtype = np.complex128
-        
-        # initialise the object
-        #-----------------------------------------------
-        if isValid('O', args):
-            modes = np.fft.fftn(args['O'])
-        else :
-            print('initialising object with random numbers')
-            modes = np.random.random(I.shape).astype(c_dtype)
-        
-        # initialise the mask, alpha value and amp
-        #-----------------------------------------------
-        self.mask = 1
-        if isValid('mask', args):
-            self.mask = args['mask']
-        
-        self.alpha = 1.0e-10
-        if isValid('alpha', args):
-            self.alpha = args['alpha']
-        
-        self.I_norm = (self.mask * I).sum()
-        self.amp    = np.sqrt(I.astype(dtype))
-        
-        # define the support projection
-        #-----------------------------------------------
-        if isValid('voxel_number', args) :
-            self.voxel_number = args['voxel_number']
-            self.support = None
-        else :
-            self.voxel_number = False
-            #
-            self.support = args['support']
-            self.S       = self.support.copy()
-        
-        # make the unit cell and diffuse weightings
-        #-----------------------------------------------
-        self.sym_ops = get_sym_ops(args)
-        
-        N          = args['disorder']['n']
-        exp        = make_exp(args['disorder']['sigma'], args['detector']['shape'])
-        lattice    = symmetry_operations.lattice(args['crystal']['unit_cell'], args['detector']['shape'])
-        #self.solid_syms = lambda x : sym_ops.solid_syms(x)
-        
-        self.unit_cell_weighting = N * lattice * exp
-        self.diffuse_weighting   = (1. - exp)
-        
-        self.modes = modes
-         
-    def object(self, modes):
-        out = np.fft.ifftn(modes)
-        return out
-
-    def Imap(self, modes):
-        # 'modes' is just our object in Fourier space
-        Us = self.sym_ops.solid_syms_Fourier(modes)
-        U  = np.sum(Us, axis=0)
-        
-        I  = self.diffuse_weighting   * np.sum( (Us * Us.conj()).real, axis=0)
-        I += self.unit_cell_weighting * (U * U.conj()).real
-        return I
-    
-    def Psup(self, modes):
-        out = modes.copy()
-        out = np.fft.ifftn(out)
-
-        if self.voxel_number :
-            self.S = choose_N_highest_pixels( (out * out.conj()).real, self.voxel_number, support = self.support)
-
-        out *= self.S
-        out = np.fft.fftn(out)
-        return out
-
-    def Pmod(self, modes):
-        out = modes.copy()
-        M   = self.Imap(out)
-        out = pmod_naive(self.amp, M, modes, self.mask, alpha = self.alpha)
-        return out
-    
-    def Emod(self, modes):
-        M         = self.Imap(modes)
-        eMod      = np.sum( self.mask * ( np.sqrt(M) - self.amp )**2 )
-        eMod      = np.sqrt( eMod / self.I_norm )
-        return eMod
-
-    def finish(self, modes):
-        out = {}
-        out['support'] = self.S
-        out['I']       = self.Imap(modes)
-        return out
-
-    def l2norm(self, delta, array0):
-        num = 0
-        den = 0
-        num += np.sum( (delta * delta.conj()).real ) 
-        den += np.sum( (array0 * array0.conj()).real ) 
-        return np.sqrt(num / den)
-     
-
-def pmod_naive(amp, M, O, mask = 1, alpha = 1.0e-10):
-    out  = mask * O * amp / np.sqrt(M + alpha)
-    out += (1 - mask) * O
-    return out
-
-
 class Mapper_ellipse():
 
     def __init__(self, I, **args):
@@ -309,13 +116,14 @@ class Mapper_ellipse():
         # initialise the object
         #-----------------------------------------------
         if isValid('solid_unit', args):
-            O = np.fft.fftn(args['solid_unit'])
+            O = args['solid_unit']
         else :
             print('initialising object with random numbers')
             O = np.random.random(I.shape).astype(c_dtype)
             print(O.shape)
         
         self.O = O
+        Ohat   = np.fft.fftn(O)
         
         # initialise the mask, alpha value and amp
         #-----------------------------------------------
@@ -370,12 +178,12 @@ class Mapper_ellipse():
         self.modes = np.zeros( (2 * self.sym_ops.no_solid_units,) + O.shape, O.dtype)
         
         # diffuse terms
-        #self.modes[:self.modes.shape[0]//2] = self.sym_ops.solid_syms_Fourier(O, apply_translation = False, syms = self.modes[:self.modes.shape[0]//2])
-        self.modes[:self.modes.shape[0]//2] = self.sym_ops.solid_syms_Fourier(O, apply_translation = False)
+        #self.modes[:self.modes.shape[0]//2] = self.sym_ops.solid_syms_Fourier(Ohat, apply_translation = False, syms = self.modes[:self.modes.shape[0]//2])
+        self.modes[:self.modes.shape[0]//2] = self.sym_ops.solid_syms_Fourier(Ohat, apply_translation = False)
         
         # unit cell terms
-        #self.modes[self.modes.shape[0]//2:] = self.sym_ops.solid_syms_Fourier(O, apply_translation = True, syms = self.modes[self.modes.shape[0]//2:])
-        self.modes[self.modes.shape[0]//2:] = self.sym_ops.solid_syms_Fourier(O, apply_translation = True)
+        #self.modes[self.modes.shape[0]//2:] = self.sym_ops.solid_syms_Fourier(Ohat, apply_translation = True, syms = self.modes[self.modes.shape[0]//2:])
+        self.modes[self.modes.shape[0]//2:] = self.sym_ops.solid_syms_Fourier(Ohat, apply_translation = True)
         
         # Ellipse axes
         #-----------------------------------------------
@@ -679,7 +487,7 @@ class Mapper_ellipse():
         info.update(self.finish(modes))
         return s1, info
 
-    def scans_cheshire(self, solid, steps=[4,4,4], unit_cell=False, err = 'Emod'):
+    def scans_cheshire_newer_old(self, solid, steps=[4,4,4], unit_cell=False, err = 'Emod'):
         """
         scan the solid unit through the cheshire cell 
         until the best agreement with the data is found.
@@ -741,7 +549,116 @@ class Mapper_ellipse():
         info['eCon'] = [self.l2norm(self.modes - modes, modes)]
         info.update(self.finish(modes))
         return s1, info
+    
+    def scans_cheshire(self, solid, steps=[1,1,1], unit_cell=False, err = 'Emod'):
+        """
+        scan the solid unit through the cheshire cell 
+        until the best agreement with the data is found.
+        """
+        if err == 'Emod' :
+            err = self.Emod 
 
+        I, J, K = self.sym_ops.unitcell_size
+        if unit_cell is False :
+            I //= 2
+            J //= 2
+            K //= 2
+        
+        errors = np.zeros((I, J, K), dtype=np.float)
+        errors.fill(np.inf)
+        
+        # only evaluate the error on Bragg peaks that are strong 
+        Bragg_mask = self.unit_cell_weighting > 1.0e-1 * self.unit_cell_weighting[0,0,0]
+
+        # symmetrise it so that we have all pairs in the point group
+        Bragg_mask = self.sym_ops.solid_syms_Fourier(Bragg_mask, apply_translation=False)
+        Bragg_mask = np.sum(Bragg_mask, axis=0)>0
+        
+        # propagate
+        s  = np.fft.fftn(solid)
+        s1 = np.zeros_like(s)
+        
+        qi = np.fft.fftfreq(s.shape[0]) 
+        qj = np.fft.fftfreq(s.shape[1])
+        qk = np.fft.fftfreq(s.shape[2])
+        qi, qj, qk = np.meshgrid(qi, qj, qk, indexing='ij')
+        qi = qi[Bragg_mask]
+        qj = qj[Bragg_mask]
+        qk = qk[Bragg_mask]
+        
+        ii = np.fft.fftfreq(s.shape[0], 1./s.shape[0]).astype(np.int)
+        jj = np.fft.fftfreq(s.shape[1], 1./s.shape[1]).astype(np.int)
+        kk = np.fft.fftfreq(s.shape[2], 1./s.shape[2]).astype(np.int)
+        ii, jj, kk = np.meshgrid(ii, jj, kk, indexing='ij')
+        ii = ii[Bragg_mask]
+        jj = jj[Bragg_mask]
+        kk = kk[Bragg_mask]
+        
+        sBragg = s[Bragg_mask]
+        e0_inf = self.e0_inf[Bragg_mask] == 0 
+        e1_inf = self.e1_inf[Bragg_mask] == 0 
+        modes  = np.empty((self.modes.shape[0],)+s[Bragg_mask].shape, dtype=self.modes.dtype)
+        amp    = self.amp[Bragg_mask] 
+        if self.mask is not 1 :
+            mask = self.mask[Bragg_mask] 
+        else :
+            mask = 1
+        I_norm = np.sum(mask*amp**2)
+        diffuse_weighting    = self.diffuse_weighting[Bragg_mask]
+        unit_cell_weighting  = self.unit_cell_weighting[Bragg_mask]
+        
+        for i in range(0, I, steps[0]):
+            for j in range(0, J, steps[1]):
+                for k in range(0, K, steps[2]):
+                    phase_ramp = np.exp(- 2J * np.pi * (i * qi + j * qj + k * qk))
+                     
+                    s1[Bragg_mask] = sBragg * phase_ramp
+                     
+                    # broadcast
+                    modes[: modes.shape[0]//2] = self.sym_ops.solid_syms_Fourier_masked(s1, ii, jj, kk, apply_translation=False, syms = modes[: modes.shape[0]//2])
+                    modes[modes.shape[0]//2 :] = self.sym_ops.solid_syms_Fourier_masked(s1, ii, jj, kk, apply_translation=True,  syms = modes[modes.shape[0]//2 :])
+                    
+                    # I map
+                    U  = np.sum(modes[modes.shape[0]//2 :], axis=0)
+                    D  = modes[: modes.shape[0]//2]
+                     
+                    I  = diffuse_weighting   * np.sum( (D * D.conj()).real, axis=0)
+                    I += unit_cell_weighting * (U * U.conj()).real
+                    
+                    # Emod
+                    mask      = mask * e0_inf * e1_inf
+                    eMod      = np.sum( mask * ( np.sqrt(I) - amp )**2 )
+                    eMod      = np.sqrt( eMod / I_norm )
+
+                    errors[i, j, k] = eMod
+        
+        l = np.argmin(errors)
+        i, j, k = np.unravel_index(l, errors.shape)
+        print('lowest error at: i, j, k, err', i, j, k, errors[i,j,k])
+          
+        # shift
+        qi = np.fft.fftfreq(s.shape[0]) 
+        qj = np.fft.fftfreq(s.shape[1])
+        qk = np.fft.fftfreq(s.shape[2])
+        T0 = np.exp(- 2J * np.pi * i * qi)
+        T1 = np.exp(- 2J * np.pi * j * qj)
+        T2 = np.exp(- 2J * np.pi * k * qk)
+        phase_ramp = reduce(np.multiply.outer, [T0, T1, T2])
+        s1         = s * phase_ramp
+        
+        # broadcast
+        modes  = np.empty(self.modes.shape, dtype=self.modes.dtype)
+        modes[: modes.shape[0]//2] = self.sym_ops.solid_syms_Fourier(s1, apply_translation=False)
+        modes[modes.shape[0]//2 :] = self.sym_ops.solid_syms_Fourier(s1, apply_translation=True)
+        
+        s1 = np.fft.ifftn(s1)
+        
+        info = {}
+        info['eMod'] = [errors[i, j, k]]
+        info['error_map'] = errors
+        info['eCon'] = [self.l2norm(self.modes - modes, modes)]
+        info.update(self.finish(modes))
+        return s1, info
 
 def make_unitary_transform(N):
     U = np.zeros((N, N), dtype=np.float)

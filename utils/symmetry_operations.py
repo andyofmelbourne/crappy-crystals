@@ -166,6 +166,35 @@ class P212121():
             syms *= self.translations
         return syms
 
+    def solid_syms_Fourier_masked(self, solid, i, j, k, apply_translation = True, syms = None):
+        """
+        solid = full solid unit at the detector
+        syms  = masked syms  
+        """
+        if syms is None :
+            syms = np.empty((4,) + i.shape, dtype=solid.dtype) # syms 
+        
+        # x = x
+        syms[0] = solid[(i,j,k)]
+        
+        # x = 0.5 + x, 0.5 - y, -z
+        syms[1] = solid[(i, -j, -k)]
+        
+        # x = -x, 0.5 + y, 0.5 - z
+        syms[2] = solid[(-i, j, -k)]
+        
+        # x = 0.5 - x, -y, 0.5 + z
+        syms[3] = solid[(-i, -j, k)]
+        
+        if apply_translation :
+            if self.translations is None :
+                self.make_Ts()
+            
+            for ii in range(4):
+                syms[ii] *= self.translations[ii][(i,j,k)]
+        
+        return syms
+
     def unflip_modes_Fourier(self, U, apply_translation=True, inplace = False):
         if inplace :
             U_inv = U
@@ -182,17 +211,17 @@ class P212121():
         #U_inv[0] = U_inv[0]
         
         # x = 0.5 + x, 0.5 - y, -z
-        U_inv[1][:, 0, :]  = U_inv[1][:, 0, :]
+        #U_inv[1][:, 0, :]  = U_inv[1][:, 0, :]
         U_inv[1][:, 1:, :] = U_inv[1][:, -1:0:-1, :]
         U_inv[1][:, :, 1:] = U_inv[1][:, :, -1:0:-1]
 
         # x = -x, 0.5 + y, 0.5 - z
-        U_inv[2][0, :, :]  = U_inv[2][0, :, :]
+        #U_inv[2][0, :, :]  = U_inv[2][0, :, :]
         U_inv[2][1:, :, :] = U_inv[2][-1:0:-1, :, :]
         U_inv[2][:, :, 1:] = U_inv[2][:, :, -1:0:-1]
         
         # x = 0.5 - x, -y, 0.5 + z
-        U_inv[3][0, :, :]  = U_inv[3][0, :, :]
+        #U_inv[3][0, :, :]  = U_inv[3][0, :, :]
         U_inv[3][1:, :, :] = U_inv[3][-1:0:-1, :, :]
         U_inv[3][:, 1:, :] = U_inv[3][:, -1:0:-1, :]
 

@@ -83,7 +83,7 @@ def phase(mapper, iters_str = '100DM 100ERA'):
            O, info = phasing_3d.DM(iters, mapper = mapper)
         
         if alg == 'cheshire':
-           O, info = mapper.scans_cheshire(O, steps=[4,4,4])
+           O, info = mapper.scans_cheshire(O, steps=[1,1,1])
          
         eMod += info['eMod']
         eCon += info['eCon']
