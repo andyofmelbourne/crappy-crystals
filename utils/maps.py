@@ -377,8 +377,6 @@ class Mapper_ellipse():
         #self.modes[self.modes.shape[0]//2:] = self.sym_ops.solid_syms_Fourier(O, apply_translation = True, syms = self.modes[self.modes.shape[0]//2:])
         self.modes[self.modes.shape[0]//2:] = self.sym_ops.solid_syms_Fourier(O, apply_translation = True)
         
-        print('eMod(modes0):', self.Emod(self.modes))
-
         # Ellipse axes
         #-----------------------------------------------
         # Here we have :
@@ -453,6 +451,8 @@ class Mapper_ellipse():
         print('np.sum(((x/e0)**2 + (y/e1)**2 - 1)**2):', np.sum((iden - 1)**2))
         self.e0_inf = self.e0_inf.astype(np.uint8)
         self.e1_inf = self.e1_inf.astype(np.uint8)
+        print('eMod(modes0):', self.Emod(self.modes))
+
          
     def object(self, modes):
         out = np.fft.ifftn(modes[0])
@@ -538,7 +538,8 @@ class Mapper_ellipse():
         
         u = np.dot(Ut, U.reshape((U.shape[0], -1)))
         
-        y = np.abs(np.sum(U, axis=0) / np.sqrt(U.shape[0]))
+        y = np.abs(u[0]) # np.abs(np.sum(U, axis=0) / np.sqrt(U.shape[0]))
+        forbidden = (y.ravel() < 1000*self.alpha)
         
         # project onto xp yp
         #-----------------------------------------------
@@ -546,23 +547,27 @@ class Mapper_ellipse():
                                                   x.ravel(), y.ravel(), 
                                                   self.e0_inf.ravel(), self.e1_inf.ravel())
         xp = xp.reshape(self.e0.shape)
-        yp = yp.reshape(self.e0.shape)
+        #yp = yp.reshape(self.e0.shape)
+        #y  = y.reshape(self.e0.shape)
         
         # xp yp --> modes
         #-----------------------------------------------
-        rx = xp / (x + self.alpha)
         out = modes.copy()
-        out[: modes.shape[0]//2] *= rx
+        out[: modes.shape[0]//2] *= xp / (x + self.alpha)
         
-        ry = yp / (y + self.alpha)
-        u[0] *= ry.ravel()
+        # for forbidden reflections be more careful 
+        angle = np.angle(u[0][forbidden])
+        u[0][forbidden] = yp[forbidden] * np.exp(1J * angle)
+        
+        # for everything else just scale (this is much faster)
+        u[0][~forbidden] *= (yp[~forbidden] / y.ravel()[~forbidden]).ravel()
         
         # un rotate the y's
         out[modes.shape[0]//2 :] = np.dot(Ut.T, u).reshape(U.shape)
         
-        # store the latest eMod
-        delta     = modes[0] - out[0]
-        self.eMod = self.l2norm(delta, out[0])
+        # store the latest eMod, but just use one mode to speed this up
+        delta     = modes[4] - out[4]
+        self.eMod = self.l2norm(delta, out[4])
         # check
         print(' sum | sqrt(I) - sqrt(Imap) | : ', self.Emod(out))
         #print('Pmod -->  sum | modes - out | : ', np.sum( np.abs(modes - out) ))
@@ -570,7 +575,8 @@ class Mapper_ellipse():
 
     def Emod(self, modes):
         M         = self.Imap(modes)
-        eMod      = np.sum( self.mask * ( np.sqrt(M) - self.amp )**2 )
+        mask = self.mask * (self.e0_inf==0) * (self.e1_inf==0)
+        eMod      = np.sum( mask * ( np.sqrt(M) - self.amp )**2 )
         eMod      = np.sqrt( eMod / self.I_norm )
         
         #if eMod < 1.0e-1 :

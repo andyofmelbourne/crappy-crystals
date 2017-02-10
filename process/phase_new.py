@@ -143,6 +143,11 @@ if __name__ == '__main__':
         mask = None
     else :
         mask = f[params['mask']][()]
+    
+    if params['voxels'][0] == '/'  :
+        voxels = f[params['voxels']][()]
+    else :
+        voxels = params['voxels']
 
     # make the mapper
     #################
@@ -150,7 +155,7 @@ if __name__ == '__main__':
                                  Bragg_weighting   = f[params['bragg_weighting']][()], 
                                  diffuse_weighting = f[params['diffuse_weighting']][()], 
                                  solid_unit        = solid_unit,
-                                 voxels            = params['voxels'],
+                                 voxels            = voxels,
                                  overlap           = params['overlap'],
                                  unit_cell         = params['unit_cell'],
                                  space_group       = params['space_group'],

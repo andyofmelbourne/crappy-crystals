@@ -353,8 +353,9 @@ def project_2D_Ellipse_arrays_cython(np.ndarray[Ctype_float, ndim=1] e0,
         # do an additional projection onto the ellipse surface
         # for numerical stability when xp or yp ~ 0
         I = sqrt((xp/ep0)**2 + (yp/ep1)**2)
-        xp /= I
-        yp /= I
+        if I != 1. :
+            xp /= I
+            yp /= I
         
         # uninvert
         if y_inv :
