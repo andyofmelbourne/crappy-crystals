@@ -152,6 +152,11 @@ if __name__ == '__main__':
         voxels = f[params['voxels']][()]
     else :
         voxels = params['voxels']
+    
+    if params['support'] is None or params['support'] is False :
+        support = None
+    else :
+        support = f[params['support']][()]
 
     # make the mapper
     #################
@@ -161,6 +166,7 @@ if __name__ == '__main__':
                                  solid_unit        = solid_unit,
                                  voxels            = voxels,
                                  overlap           = params['overlap'],
+                                 support           = support,
                                  unit_cell         = params['unit_cell'],
                                  space_group       = params['space_group'],
                                  alpha             = params['alpha'],

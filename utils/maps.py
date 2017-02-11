@@ -199,7 +199,7 @@ class Mapper_ellipse():
         #-----------------------------------------------
         
         # floating point tolerance for 1/x (log10)  
-        tol = 10. #1.0e+15
+        tol = 15. #1.0e+15
         
         # check for numbers close to infinity in sqrt(I / self.diffuse_weighting)
         m = (self.diffuse_weighting <= 10.**(-tol)) + (I <= 10.**(-tol))
@@ -235,30 +235,6 @@ class Mapper_ellipse():
         
         # check that self.Imap == I * (x/e_0)**2 + (y/e_1)**2
         # or that (x/e_0)**2 + (y/e_1)**2 = 1
-        """
-        U  = self.modes[self.modes.shape[0]//2 :]
-        D  = self.modes[: self.modes.shape[0]//2]
-        # make x
-        x = np.sqrt(np.sum( (D * D.conj()).real, axis=0))
-        # make y
-        Ut = make_unitary_transform(self.modes.shape[0]//2)
-        u = np.dot(Ut, U.reshape((U.shape[0], -1)))
-        y = np.abs(np.sum(U, axis=0) / np.sqrt(U.shape[0]))
-        
-        # check for all pixels where e0 != 0 or inf
-        iden = np.zeros_like(I)
-        i = ~self.e0_inf * (self.e0 > 0.)
-        iden[i] += (x[i]/self.e0[i])**2
-        
-        i = ~self.e1_inf * (self.e1 > 0.)
-        iden[i] += (y[i]/self.e1[i])**2
-        
-        i = (self.e0 == 0) * (self.e1 == 0)
-        iden[i] = 1.
-        
-        print('Checking that (x/e0)**2 + (y/e1)**2 == 1?')
-        print('np.sum(((x/e0)**2 + (y/e1)**2 - 1)**2):', np.sum((iden - 1)**2))
-        """
         self.e0_inf = self.e0_inf.astype(np.uint8)
         self.e1_inf = self.e1_inf.astype(np.uint8)
         print('eMod(modes0):', self.Emod(self.modes))
@@ -353,8 +329,9 @@ class Mapper_ellipse():
         
         y = np.abs(u) # np.abs(np.sum(U, axis=0) / np.sqrt(U.shape[0]))
         
-        # look for forbidden reflections
-        forbidden   = (y < 1000*self.alpha)
+        print('y sum:', np.sum(y))
+        # look for forbidden reflections where e1_inf != 1
+        forbidden   = (y < 1000*self.alpha) * (self.e1_inf != 1).ravel()
         
         # project onto xp yp
         #-----------------------------------------------
@@ -362,12 +339,14 @@ class Mapper_ellipse():
                                                   x, y, 
                                                   self.e0_inf.ravel(), self.e1_inf.ravel())
         
+        print('yp sum:', np.sum(yp))
         # xp yp --> modes
         #-----------------------------------------------
         # d *= xp / x
         #############
         out = modes.copy()
         out[: modes.shape[0]//2] *= (xp / (x + self.alpha)).reshape(D[0].shape)
+        print('D sum:', np.sum(np.abs(out[: modes.shape[0]//2])**2))
         
         # u   *= yp / y
         # U[0] = u
@@ -377,10 +356,12 @@ class Mapper_ellipse():
         angle = np.angle(u[forbidden])
         up            = np.empty_like(u)
         up[forbidden] = yp[forbidden] * np.exp(1J * angle)
+        print('up sum:', np.sum(np.abs(up)**2))
         
         # for everything else just scale (this is much faster)
-        up[~forbidden] = u[~forbidden] * yp[~forbidden] / y[~forbidden]
+        up[~forbidden] = u[~forbidden] * yp[~forbidden] / (y[~forbidden] + self.alpha)
         
+        print('up sum:', np.sum(np.abs(up)**2))
         # un-rotate
         #out[modes.shape[0]//2 :] = np.sqrt(U.shape[0])*np.fft.ifftn(u, axes=(0,)).reshape(D.shape)
         out[modes.shape[0]//2 :] += (up - u).reshape(D[0].shape) / np.sqrt(U.shape[0])
@@ -395,8 +376,7 @@ class Mapper_ellipse():
 
     def Emod(self, modes):
         M         = self.Imap(modes)
-        mask = self.mask * (self.e0_inf==0) * (self.e1_inf==0)
-        eMod      = np.sum( mask * ( np.sqrt(M) - self.amp )**2 )
+        eMod      = np.sum( self.mask * ( np.sqrt(M) - self.amp )**2 )
         eMod      = np.sqrt( eMod / self.I_norm )
         
         #if eMod < 1.0e-1 :

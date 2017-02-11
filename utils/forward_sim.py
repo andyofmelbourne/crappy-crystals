@@ -156,7 +156,7 @@ def generate_diff(solid_unit, unit_cell, N, sigma, **params):
     # define the solid_unit support
     ###############################
     if io_utils.isValid('support_frac', params):
-        support = padding.expand_region_by(solid_unit > 0.1, params['support_frac'])
+        support = padding.expand_region_by(solid_unit > 0., params['support_frac'])
     else :
         support = np.abs(solid_unit) > 0.
     
