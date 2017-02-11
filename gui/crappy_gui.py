@@ -15,6 +15,11 @@ except NameError :
     pass
 
 try :
+    input = raw_input
+except NameError :
+    pass
+
+try :
     import ConfigParser as configparser 
 except ImportError :
     import configparser 
@@ -98,7 +103,7 @@ def parse_cmdline_args():
         
         # mkdir if it does not exist
         if not os.path.exists(outputdir):
-            yn = raw_input(str(args.filename) + ' does not exist. Create it? [y]/n : ')
+            yn = input(str(args.filename) + ' does not exist. Create it? [y]/n : ')
             print('yn:', yn)
             if yn.strip() == 'y' or yn.strip() == '' :
                 os.makedirs(outputdir)
