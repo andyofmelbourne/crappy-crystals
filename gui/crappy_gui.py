@@ -92,9 +92,22 @@ def parse_cmdline_args():
     
     args = parser.parse_args()
     
-    # check that cxi file exists
+    # check that h5 file exists
     if not os.path.exists(args.filename):
-        raise NameError('h5 file does not exist: ' + args.filename)
+        outputdir = os.path.split(os.path.abspath(args.filename))[0]
+        
+        # mkdir if it does not exist
+        if not os.path.exists(outputdir):
+            yn = raw_input(str(args.filename) + ' does not exist. Create it? [y]/n : ')
+            print('yn:', yn)
+            if yn.strip() == 'y' or yn.strip() == '' :
+                os.makedirs(outputdir)
+                
+                # make an empty file
+                f = h5py.File(args.filename, 'w')
+                f.close()
+            else :
+                raise NameError('h5 file does not exist: ' + args.filename)
     
     return args
 

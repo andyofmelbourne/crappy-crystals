@@ -538,26 +538,27 @@ class Forward_model_widget(QtGui.QWidget):
         self.f = h5py.File(self.filename, 'r')
         print(self.crystal_path, init)
         
+        if init :
+            # crystal
+            frame_plt = pg.PlotItem(title = 'real space crystal projections')
+            self.imageView = pg.ImageView(view = frame_plt)
+            self.imageView.ui.menuBtn.hide()
+            self.imageView.ui.roiBtn.hide()
+            
+            # diff
+            frame_plt2 = pg.PlotItem(title = 'diffraction volume slices')
+            self.imageView2 = pg.ImageView(view = frame_plt2)
+            self.imageView2.ui.menuBtn.hide()
+            self.imageView2.ui.roiBtn.hide()
+            
+            self.im_init = False
+    
+            splitter = QtGui.QSplitter(QtCore.Qt.Vertical)
+            splitter.addWidget(self.imageView)
+            splitter.addWidget(self.imageView2)
+        
         if self.crystal_path in self.f :
             print('making arrays...')
-            if init :
-                # crystal
-                frame_plt = pg.PlotItem(title = 'real space crystal projections')
-                self.imageView = pg.ImageView(view = frame_plt)
-                self.imageView.ui.menuBtn.hide()
-                self.imageView.ui.roiBtn.hide()
-                
-                # diff
-                frame_plt2 = pg.PlotItem(title = 'diffraction volume slices')
-                self.imageView2 = pg.ImageView(view = frame_plt2)
-                self.imageView2.ui.menuBtn.hide()
-                self.imageView2.ui.roiBtn.hide()
-                
-                self.im_init = False
-        
-                splitter = QtGui.QSplitter(QtCore.Qt.Vertical)
-                splitter.addWidget(self.imageView)
-                splitter.addWidget(self.imageView2)
 
             # real-space crystal view 
             #########################
