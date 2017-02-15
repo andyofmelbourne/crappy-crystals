@@ -114,7 +114,8 @@ def ERA(iters, **args):
         # metrics
         #eMod    = mapper.l2norm(modes1, modes0)
         #eMod    = mapper.Emod(modes)
-        eMod    = mapper.eMod
+        #eMod    = mapper.eMod
+        eMod    = mapper.Emod(modes)
         #eMod = 0
         
         dO   = mapper.O - O0
@@ -129,9 +130,9 @@ def ERA(iters, **args):
     info['eMod']  = eMods
     info['eCon']  = eCons
     
-    info.update(mapper.finish(modes))
+    info.update(mapper.finish(mapper.Psup(modes)))
     
-    O = mapper.object(modes)
+    O = mapper.O
     return O, info
 
 

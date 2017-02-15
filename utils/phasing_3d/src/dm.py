@@ -22,7 +22,7 @@ try :
 except ImportError :
     rank = 0
 
-def DM(iters, **args):
+def DM(iters, beta = 1, **args):
     """
     Find the phases of 'I' given O using the Error Reduction Algorithm.
     
@@ -160,41 +160,76 @@ def DM(iters, **args):
     if iters > 0  and rank==0:
         print('\n\nalgrithm progress iteration convergence modulus error')
     
-    for i in range(iters) :
-        
-        # reference
-        O0 = mapper.O.copy()
-        
-        # update 
-        #-------
-        modes += mapper.Pmod(modes_sup * 2 - modes) - modes_sup
-        
-        # metrics
-        #--------
-        #modes0 -= modes
-        #eCon    = mapper.l2norm(modes0, modes)
-        
-        # f* = Ps f_i = PM (2 Ps f_i - f_i)
-        modes_sup = mapper.Psup(modes)
+    if beta == 1 :
+        for i in range(iters) :
+            
+            # reference
+            O0 = mapper.O.copy()
+            
+            # update 
+            #-------
+            modes += mapper.Pmod(modes_sup * 2 - modes) - modes_sup
+            
+            # metrics
+            #--------
+            #modes0 -= modes
+            #eCon    = mapper.l2norm(modes0, modes)
+            
+            # f* = Ps f_i = PM (2 Ps f_i - f_i)
+            modes_sup = mapper.Psup(modes)
 
-        dO   = mapper.O - O0
-        eCon = mapper.l2norm(dO, O0)
-        
-        #eMod = mapper.Emod(modes_sup)
-        eMod = mapper.eMod
-        
-        if rank == 0 : era.update_progress(i / max(1.0, float(iters-1)), 'DM', i, eCon, eMod )
-        
-        eMods.append(eMod)
-        eCons.append(eCon)
+            dO   = mapper.O - O0
+            eCon = mapper.l2norm(dO, O0)
+            
+            eMod = mapper.Emod(modes_sup)
+            #eMod = mapper.eMod
+            
+            if rank == 0 : era.update_progress(i / max(1.0, float(iters-1)), 'DM', i, eCon, eMod )
+            
+            eMods.append(eMod)
+            eCons.append(eCon)
+    else :
+        modes_mod = mapper.Pmod(modes)
+        for i in range(iters) :
+            
+            # reference
+            O0 = mapper.O.copy()
+            
+            # update 
+            #-------
+            a = mapper.Pmod(modes_sup + 1/beta * (modes_sup - modes))
+            b = mapper.Psup(modes_mod - 1/beta * (modes_mod - modes))
+            modes += beta * ( a - b )
+            
+            # metrics
+            #--------
+            #modes0 -= modes
+            #eCon    = mapper.l2norm(modes0, modes)
+            
+            # f* = Ps f_i = PM (2 Ps f_i - f_i)
+            modes_sup = mapper.Psup(modes)
+            modes_mod = mapper.Pmod(modes)
+            
+            dO   = mapper.O - O0
+            eCon = mapper.l2norm(dO, O0)
+            
+            # this is really the error of the last iteration
+            eMod = mapper.Emod(b)
+            #eMod = mapper.eMod
+            
+            if rank == 0 : era.update_progress(i / max(1.0, float(iters-1)), 'DM', i, eCon, eMod )
+            
+            eMods.append(eMod)
+            eCons.append(eCon)
     
     info = {}
     info['eMod']  = eMods
     info['eCon']  = eCons
     
-    O = mapper.object(modes_sup)
+    a = mapper.Pmod(modes_sup + 1/beta * (modes_sup - modes))
+    info.update(mapper.finish(a))
     
-    info.update(mapper.finish(modes_sup))
+    O = mapper.O
     
     return O, info
 

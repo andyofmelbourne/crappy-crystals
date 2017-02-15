@@ -46,7 +46,7 @@ def config_iters_to_alg_num(string):
     alg_iters = [ [steps[i+1].strip(), int(steps[i])] for i in range(0, len(steps), 2)]
     return alg_iters
 
-def phase(mapper, iters_str = '100DM 100ERA'):
+def phase(mapper, iters_str = '100DM 100ERA', beta=1):
     """
     phase a crappy crystal diffraction volume
     
@@ -80,7 +80,7 @@ def phase(mapper, iters_str = '100DM 100ERA'):
            O, info = phasing_3d.ERA(iters, mapper = mapper)
          
         if alg == 'DM':
-           O, info = phasing_3d.DM(iters, mapper = mapper)
+           O, info = phasing_3d.DM(iters, mapper = mapper, beta=beta)
         
         if alg == 'cheshire':
            O, info = mapper.scans_cheshire(O, steps=[1,1,1])
@@ -148,7 +148,9 @@ if __name__ == '__main__':
     else :
         mask = f[params['mask']][()]
     
-    if type(params['voxels']) != int and params['voxels'][0] == '/'  :
+    if params['voxels'] is None :
+        voxels = None
+    elif type(params['voxels']) != int and params['voxels'][0] == '/'  :
         voxels = f[params['voxels']][()]
     else :
         voxels = params['voxels']
@@ -176,8 +178,7 @@ if __name__ == '__main__':
 
     # phase
     #######
-    O, mapper, eMod, eCon, info = phase(mapper, params['iters'])
-
+    O, mapper, eMod, eCon, info = phase(mapper, params['iters'], params['beta'])
 
     # output
     ########
@@ -204,6 +205,48 @@ if __name__ == '__main__':
     if key in f :
         del f[key]
     f[key] = mapper.sym_ops.solid_to_crystal_real(O)
+
+    # e0
+    key = group+'/e0'
+    if key in f :
+        del f[key]
+    f[key] = mapper.e0
+
+    # e1
+    key = group+'/e1'
+    if key in f :
+        del f[key]
+    f[key] = mapper.e1
+
+    # e0_inf
+    key = group+'/e0_inf'
+    if key in f :
+        del f[key]
+    f[key] = mapper.e0_inf
+
+    # e1_inf
+    key = group+'/e1_inf'
+    if key in f :
+        del f[key]
+    f[key] = mapper.e1_inf
+    
+    # mask * (sqrt(M) - amp)**2
+    #key = group+'/diff_amp'
+    #if key in f :
+    #    del f[key]
+    #f[key] = mapper.M
+
+    # yp
+    #key = group+'/yp'
+    #if key in f :
+    #    del f[key]
+    #f[key] = (mapper.yp - mapper.amp)
+
+    # I0
+    key = group+'/I0'
+    if key in f :
+        del f[key]
+    f[key] = mapper.I0
 
     del info['eMod']
     del info['eCon']

@@ -102,11 +102,12 @@ def parse_cmdline_args():
         outputdir = os.path.split(os.path.abspath(args.filename))[0]
         
         # mkdir if it does not exist
-        if not os.path.exists(outputdir):
+        if not os.path.exists(args.filename):
             yn = input(str(args.filename) + ' does not exist. Create it? [y]/n : ')
             print('yn:', yn)
             if yn.strip() == 'y' or yn.strip() == '' :
-                os.makedirs(outputdir)
+                if not os.path.exists(outputdir):
+                    os.makedirs(outputdir)
                 
                 # make an empty file
                 f = h5py.File(args.filename, 'w')

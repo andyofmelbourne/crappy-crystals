@@ -89,6 +89,10 @@ def generate_diff(solid_unit, unit_cell, N, sigma, **params):
     background_scale : float or None or False, optional, default (1.)
         The scale factor of the background. If 'background' is None or 
         False then this is ignored.
+
+    lattice_blur : float, optional, default (None)
+        If not 'None' then blur the lattice function with a gaussian of
+        by 'lattice_blur' standard deviation (in pixels)
         
     turn_off_bragg : bool, optional, default (False)
         If True then exclude the Bragg peaks from the diffraction volume
@@ -174,7 +178,15 @@ def generate_diff(solid_unit, unit_cell, N, sigma, **params):
     # generate the diffuse and Bragg weighting modes
     ################################################
     exp     = make_exp(sigma, solid_unit.shape)
+
+    # make the lattice
+    ##################
     lattice = symmetry_operations.lattice(unit_cell, solid_unit.shape)
+    if io_utils.isValid('lattice_blur', params) :
+        import scipy.ndimage
+        lattice = scipy.ndimage.filters.gaussian_filter(lattice, params['lattice_blur'], truncate=10.)
+        print('Bluring the lattice function...', lattice.dtype)
+
     Bw      = N * exp * lattice 
     Dw      = (1. - exp) 
     
@@ -192,6 +204,12 @@ def generate_diff(solid_unit, unit_cell, N, sigma, **params):
         D.fill(0)
         Dw.fill(0)
     
+    Bsum = np.sum(B)
+    Dsum = np.sum(D)
+    print('integrated intensity of the Bragg reflections:', Bsum)
+    print('integrated intensity of the diffuse scatter  :', Dsum)
+    print('fractional total intensity of the Bragg reflections:', Bsum / (Bsum+Dsum))
+    print('fractional total intensity of the diffuse scatter  :', Dsum / (Bsum+Dsum))
     diff = B + D
     
     # add photon counting noise

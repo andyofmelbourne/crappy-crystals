@@ -11,7 +11,7 @@ cdef inline float float_max(float a, float b): return a if a >= b else b
 #float_max = max
 
 
-def project_2D_Ellipse_cython(double e0, double e1, double x, double y, bint e0_inf = 0, bint e1_inf = 0):
+def project_2D_Ellipse_cython(double e0, double e1, double x, double y, bint e0_inf = 0, bint e1_inf = 0, bint I0 = 0):
     """
     Solve the ellipse projection problem for a 2D ellipse.
     
@@ -68,6 +68,9 @@ def project_2D_Ellipse_cython(double e0, double e1, double x, double y, bint e0_
     cdef int i
     cdef double s0, s1, s, ratio0, ratio1, g, n0, n1, r0, r1, u, v
 
+    #if I0 :
+    #    return 0., 0.
+    
     if e0_inf and e1_inf :
         return x, y
     
@@ -225,7 +228,8 @@ def project_2D_Ellipse_arrays_cython(np.ndarray[Ctype_float, ndim=1] e0,
                                      np.ndarray[Ctype_float, ndim=1] x,
                                      np.ndarray[Ctype_float, ndim=1] y,
                                      np.ndarray[Ctype_bool, ndim=1] e0_inf,
-                                     np.ndarray[Ctype_bool, ndim=1] e1_inf):
+                                     np.ndarray[Ctype_bool, ndim=1] e1_inf,
+                                     np.ndarray[Ctype_bool, ndim=1] I0):
     cdef int i, flipped
     cdef unsigned int ii
     cdef int x_inv = 0
@@ -237,12 +241,17 @@ def project_2D_Ellipse_arrays_cython(np.ndarray[Ctype_float, ndim=1] e0,
     cdef np.ndarray[Ctype_float, ndim = 1] v = np.empty((ii_max), dtype=np.float)
     
     for ii in range(ii_max):
-        if e0_inf[ii] and e1_inf[ii] :
+        #if I0[ii] == 1 :
+        #    u[ii] = 0.
+        #    v[ii] = 0.
+        #    continue
+        
+        if e0_inf[ii] == 1 and e1_inf[ii] == 1 :
             u[ii] = x[ii]
             v[ii] = y[ii]
             continue
         
-        elif e0_inf[ii] :
+        elif e0_inf[ii] == 1 :
             u[ii] = x[ii]
             if y[ii] < 0 :
                 v[ii] = -e1[ii]
@@ -250,7 +259,7 @@ def project_2D_Ellipse_arrays_cython(np.ndarray[Ctype_float, ndim=1] e0,
                 v[ii] = e1[ii]
             continue
                 
-        elif e1_inf[ii] :
+        elif e1_inf[ii] == 1 :
             v[ii] = y[ii]
             if x[ii] < 0 :
                 u[ii] = -e0[ii]

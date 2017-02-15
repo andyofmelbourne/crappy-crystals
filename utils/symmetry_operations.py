@@ -114,7 +114,8 @@ class P212121():
     """
     def __init__(self, unitcell_size, det_shape, dtype=np.complex128):
         # only calculate the translations when they are needed
-        self.translations = None
+        self.translations      = None
+        self.translations_conj = None
         self.no_solid_units = 4
         
         self.unitcell_size = unitcell_size
@@ -135,7 +136,8 @@ class P212121():
         T2 = T_fourier(det_shape, [0.0, unitcell_size[1]/2., unitcell_size[2]/2.])
         # x = 0.5 - x, -y, 0.5 + z
         T3 = T_fourier(det_shape, [unitcell_size[0]/2., 0.0, unitcell_size[2]/2.])
-        self.translations = np.array([T0, T1, T2, T3])
+        self.translations      = np.array([T0, T1, T2, T3])
+        self.translations_conj = self.translations.conj()
     
     def solid_syms_Fourier(self, solid, apply_translation = True, syms = None):
         if syms is None :
@@ -205,7 +207,7 @@ class P212121():
             if self.translations is None :
                 self.make_Ts()
             
-            U_inv *= self.translations.conj()
+            U_inv *= self.translations_conj
         
         # x = x
         #U_inv[0] = U_inv[0]

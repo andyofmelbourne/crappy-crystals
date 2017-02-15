@@ -58,7 +58,9 @@ def add_noise_3d(diff, n, is_fft_shifted = True, remove_courners = True, unit_ce
     diff_out  = diff_out * R_scale
 
     # normalise
-    diff_out = diff_out / np.sum(diff_out)
+    dsum = np.sum(diff_out)
+    diff_out = diff_out / dsum
+    print('sum of diffraction intensity after R-scaling:', dsum)
 
     # calculate the total number of photons
     # from the mean number of photons per speckle
@@ -69,8 +71,11 @@ def add_noise_3d(diff, n, is_fft_shifted = True, remove_courners = True, unit_ce
     else :
         over_sampling = 2.
 
+    """
     rav = rad_av(diff_out)
     N = float(n) / (over_sampling * rav[int(np.min(diff.shape) / 2. - 1.)])
+    """
+    N = float(n)
     print('total number of photons required:', int(N))
     print('oversampling :', over_sampling)
 

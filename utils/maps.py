@@ -116,7 +116,7 @@ class Mapper_ellipse():
         # initialise the object
         #-----------------------------------------------
         if isValid('solid_unit', args):
-            O = args['solid_unit']
+            O = args['solid_unit'].astype(c_dtype)
         else :
             print('initialising object with random numbers')
             O = np.random.random(I.shape).astype(c_dtype)
@@ -127,7 +127,7 @@ class Mapper_ellipse():
         
         # initialise the mask, alpha value and amp
         #-----------------------------------------------
-        self.mask = 1
+        self.mask = np.ones(I.shape, dtype=np.bool)
         if isValid('mask', args):
             print('setting mask...')
             self.mask = args['mask']
@@ -198,45 +198,134 @@ class Mapper_ellipse():
         # e_0/1 -> inf
         #-----------------------------------------------
         
+        tol = 1.0e-10
+        
+        self.e0     = np.zeros_like(self.diffuse_weighting)
+        self.e0_inf = np.zeros(self.diffuse_weighting.shape, dtype = np.bool)
+        
+        self.e1     = np.zeros_like(self.diffuse_weighting)
+        self.e1_inf = np.zeros(self.diffuse_weighting.shape, dtype = np.bool)
+        
+        # look for special cases
+        D0 = (self.diffuse_weighting   <= tol)
+        B0 = (self.unit_cell_weighting <= tol)
+        I0 = (I                        <= tol)
+        m  = self.mask > 0 
+
+        # 'normal, on Bragg, non-masked' D>0, B>0, I>0, m != 0
+        # and
+        # 'noisey, on Bragg, non-masked' D>0, B>0, I=0, m != 0
+        i = (~D0)*(~B0)*m
+        print(i.shape, i.dtype, np.sum(i))
+        self.e0[i] = np.sqrt(I[i]) / np.sqrt(self.diffuse_weighting[i])
+        self.e1[i] = np.sqrt(I[i]) / np.sqrt(self.sym_ops.no_solid_units * self.unit_cell_weighting[i])
+        
+        self.e0_inf[i] = False
+        self.e1_inf[i] = False
+        print(np.sum(i), 'normal / noisey, diffuse, on Bragg, non-masked pixels')
+        
+        # 'normal, off Bragg, non-masked' D>0, B=0, I>0, m != 0
+        # and
+        # 'noisey, off Bragg, non-masked' D>0, B=0, I=0, m != 0
+        i = (~D0)*(B0)*m
+        self.e0[i] = np.sqrt(I[i]) / np.sqrt(self.diffuse_weighting[i])
+        self.e1[i] = np.inf
+        
+        self.e0_inf[i] = False
+        self.e1_inf[i] = True
+        print(np.sum(i), 'normal / noisey, diffuse, off Bragg, non-masked pixels')
+        
+        
+        # 'normal, no diffuse, on Bragg, non-masked' D=0, B>0, I>0, m != 0
+        # and
+        # 'noisey, no diffuse, on Bragg, non-masked' D=0, B>0, I=0, m != 0
+        i = (D0)*(~B0)*m
+        self.e0[i] = np.inf
+        self.e1[i] = np.sqrt(I[i]) / np.sqrt(self.sym_ops.no_solid_units * self.unit_cell_weighting[i])
+        
+        self.e0_inf[i] = True
+        self.e1_inf[i] = False
+        print(np.sum(i), 'normal / noisey, no diffuse, on Bragg, non-masked pixels')
+
+        # 'masked' D>=0, B>=0, I>=0, m = 0
+        if m is not 1 and m is not True :
+            i = ~m
+            self.e0[i] = np.inf
+            self.e1[i] = np.inf
+             
+            self.e0_inf[i] = True
+            self.e1_inf[i] = True
+            print(np.sum(i), 'masked pixels')
+
+        # test: try masking pixels for which D>0 or B>0 and I==0 
+        i = (D0 + B0)*(I0)*m
+        self.e0[i] = np.inf
+        self.e1[i] = np.inf
+         
+        self.e0_inf[i] = True
+        self.e1_inf[i] = True
+        self.mask[i] = False
+
+        # 'everything zero pixels' D=0, B=0, I=0 non-masked
+        i = (D0)*(B0)*(I0)*m
+        self.e0[i] = 0.
+        self.e1[i] = 0.
+         
+        self.e0_inf[i] = True
+        self.e1_inf[i] = True
+        print(np.sum(i), 'everything zero pixels')
+        
+        # 'weired pixels' D=0, B=0, I>=0 non-masked
+        # for now raise an exception if there are any of these
+        i = (D0)*(B0)*(~I0)*m
+        if np.sum(i) > 0 :
+            raise ValueError('Error diffuse and unit-cell weighting are zero on a pixel with positive intensity')
+
+        self.e0_inf = self.e0_inf.astype(np.uint8)
+        self.e1_inf = self.e1_inf.astype(np.uint8)
+        self.I0     = I0.astype(np.uint8)
+        """
         # floating point tolerance for 1/x (log10)  
-        tol = 15. #1.0e+15
+        tol = 10. #1.0e+15
         
         # check for numbers close to infinity in sqrt(I / self.diffuse_weighting)
-        m = (self.diffuse_weighting <= 10.**(-tol)) + (I <= 10.**(-tol))
-        m[~m] = (0.5 * (np.log10(I[~m]) - np.log10(self.diffuse_weighting[~m])) >= tol) 
+        #m = (self.diffuse_weighting <= 10.**(-tol)) + (I <= 10.**(-tol))
+        #m[~m] = (0.5 * (np.log10(I[~m]) - np.log10(self.diffuse_weighting[~m])) >= tol) 
+        self.I0 = (I <= 10.**(-tol)) 
         
-        self.e0_inf   = m.copy()
-        self.e0       = np.zeros_like(self.diffuse_weighting)
-
-        # set e0 for pixels where I>0, diffuse>0, and I/diffuse < inf
-        self.e0[~m]   = np.sqrt(I[~m]) / np.sqrt(self.diffuse_weighting[~m])
+        # e0 is infinite when the weighting factor is really small
+        self.e0_inf   = np.zeros(self.diffuse_weighting.shape, dtype = np.bool)
+        self.e0_inf[ (self.diffuse_weighting <= 10.**(-tol)) ] = True
+        
+        # set e0 to >0 for pixels where I>0 and diffuse>0
+        self.e0    = np.zeros_like(self.diffuse_weighting)
+        m          = (I>= 10.**(-tol)) * ~self.e0_inf
+        self.e0[m] = np.sqrt(I[m]) / np.sqrt(self.diffuse_weighting[m])
         
         # set e0 for pixels where I~0
         m = (I <= 10.**(-tol))
         self.e0[m]  = 0.
                
-        # check for numbers close to infinity in sqrt(I / self.unit_cell_weighting)
-        m     = (self.unit_cell_weighting <= 10.**(-tol)) + (I <= 10.**(-tol))
-        m[~m] = 0.5 * (np.log10(I[~m]) - np.log10(self.unit_cell_weighting[~m])) >= tol
-              
-        self.e1_inf = m.copy()
+        # e1 is infinite when the weighting factor is really small
+        self.e1_inf   = np.zeros(self.unit_cell_weighting.shape, dtype = np.bool)
+        self.e1_inf[ (self.unit_cell_weighting <= 10.**(-tol)) ] = True
         
-        # set e1 for pixels where I>0, Bragg>0, and I/Bragg < inf
-        self.e1     = np.zeros_like(self.unit_cell_weighting)
-        self.e1[~m] = np.sqrt(I[~m]) / np.sqrt(self.sym_ops.no_solid_units * self.unit_cell_weighting[~m])
+        # set e1 to >0 for pixels where I>0 and Bragg>0
+        self.e1    = np.zeros_like(self.unit_cell_weighting)
+        m          = (I>= 10.**(-tol)) * ~self.e1_inf
+        self.e1[m] = np.sqrt(I[m]) / np.sqrt(self.sym_ops.no_solid_units * self.unit_cell_weighting[m])
         
-        # set e1 for pixels where I~0
+        # set e0 for pixels where I~0
         m = (I <= 10.**(-tol))
-        self.e1[m] = 0.
+        self.e1[m]  = 0.
         
         print('number of good pixels for elliptical projections: e0, e1, both', np.sum(~self.e0_inf), np.sum(~self.e1_inf), np.sum(~self.e1_inf * ~self.e0_inf))
+        """
         
         self.iters = 0
         
         # check that self.Imap == I * (x/e_0)**2 + (y/e_1)**2
         # or that (x/e_0)**2 + (y/e_1)**2 = 1
-        self.e0_inf = self.e0_inf.astype(np.uint8)
-        self.e1_inf = self.e1_inf.astype(np.uint8)
         print('eMod(modes0):', self.Emod(self.modes))
 
          
@@ -253,61 +342,80 @@ class Mapper_ellipse():
         return I
     
     def Psup(self, modes):
-        #return modes.copy()
-        out = np.empty_like(modes)
+        #import time
+        #t0 = time.time()
+        
+        #out = np.empty_like(modes)
+        out = modes.copy()
         
         # diffuse terms: unflip the modes
         out[: modes.shape[0]//2] = \
-                self.sym_ops.unflip_modes_Fourier(modes[: modes.shape[0]//2], apply_translation = False)
+                self.sym_ops.unflip_modes_Fourier(out[: out.shape[0]//2], apply_translation = False, inplace=True)
         
         # unit_cell terms: unflip the modes
         out[modes.shape[0]//2 :] = \
-                self.sym_ops.unflip_modes_Fourier(modes[modes.shape[0]//2 :], apply_translation = True)
+                self.sym_ops.unflip_modes_Fourier(out[out.shape[0]//2 :], apply_translation = True, inplace=True)
         
         # average 
-        out = np.mean(out, axis=0)
+        out_solid = np.mean(out, axis=0)
         
-        # propagate
-        out = np.fft.ifftn(out)
+        #t1 = time.time()
 
+        # propagate
+        out_solid = np.fft.ifftn(out_solid)
+
+        # reality
+        out_solid.imag = 0
+
+        #t2 = time.time()
         # finite support
         if self.voxel_number :
             if self.overlap == 'unit_cell' :
-                self.voxel_support = choose_N_highest_pixels( (out * out.conj()).real, self.voxel_number, \
+                self.voxel_support = choose_N_highest_pixels( (out_solid * out_solid.conj()).real.astype(np.float32), self.voxel_number, \
                                      support = self.support, mapper = self.sym_ops.solid_syms_real)
             elif self.overlap == 'crystal' :
                 # try using the crystal mapping instead of the unit-cell mapping
-                self.voxel_support = choose_N_highest_pixels( (out * out.conj()).real.astype(np.float32), self.voxel_number, \
+                self.voxel_support = choose_N_highest_pixels( (out_solid * out_solid.conj()).real.astype(np.float32), self.voxel_number, \
                                      support = self.support, mapper = self.sym_ops.solid_to_crystal_real)
             elif self.overlap is None :
-                # try using the crystal mapping instead of the unit-cell mapping
-                self.voxel_support = choose_N_highest_pixels( (out * out.conj()).real.astype(np.float32), self.voxel_number, \
+                self.voxel_support = choose_N_highest_pixels( (out_solid * out_solid.conj()).real.astype(np.float32), self.voxel_number, \
                                      support = self.support, mapper = None)
             else :
                 raise ValueError("overlap must be one of 'unit_cell', 'crystal' or None")
         
-        out *= self.voxel_support
-
-        # reality
-        out.imag = 0
+        out_solid *= self.voxel_support
+        
+        #t3 = time.time()
         
         # store the latest guess for the object
-        self.O = out.copy()
+        self.O = out_solid.copy()
         
         # propagate
-        out = np.fft.fftn(out)
+        #t4 = time.time()
+        out_solid = np.fft.fftn(out_solid)
         
+        #t5 = time.time()
         # broadcast
-        modes_out = np.empty_like(self.modes)
-        modes_out[: modes_out.shape[0]//2] = self.sym_ops.solid_syms_Fourier(out, apply_translation=False, syms=modes_out[: modes_out.shape[0]//2])
-        modes_out[modes_out.shape[0]//2 :] = self.sym_ops.solid_syms_Fourier(out, apply_translation=True,  syms=modes_out[modes_out.shape[0]//2 :])
+        out[: out.shape[0]//2] = self.sym_ops.solid_syms_Fourier(out_solid, apply_translation=False, syms=out[: out.shape[0]//2])
+        out[out.shape[0]//2 :] = self.sym_ops.solid_syms_Fourier(out_solid, apply_translation=True,  syms=out[out.shape[0]//2 :])
 
         self.iters += 1
         
-        #print(' sum | sqrt(I) - sqrt(Imap) | : ', self.Emod(modes_out))
-        return modes_out
+        #t6 = time.time()
+        #print(' sum | sqrt(I) - sqrt(Imap) | : ', self.Emod(out))
+        #print('\nPsup')
+        #print('total time        :', t6-t0)
+        #print('unflip + mean time:', t1-t0)
+        #print('ifftn time        :', t2-t1)
+        #print('finite sup time   :', t3-t2)
+        #print('imag copy time    :', t4-t3)
+        #print('fftn time         :', t5-t4)
+        #print('broadcast time    :', t6-t5)
+        return out
 
     def Pmod(self, modes):
+        #import time
+        #t0 = time.time()
         U  = modes[modes.shape[0]//2 :]
         D  = modes[: modes.shape[0]//2]
         
@@ -325,58 +433,89 @@ class Mapper_ellipse():
         # actually this is just an fft!
         # just have to make sure that it is norm preserving
         #u = (np.fft.fftn(U, axes=(0,))/np.sqrt(U.shape[0])).reshape((U.shape[0], -1))
-        u = (np.fft.fftn(U, axes=(0,))/np.sqrt(U.shape[0]))[0].ravel()
+        #u = (np.fft.fftn(U, axes=(0,))/np.sqrt(U.shape[0]))[0].ravel()
+        u = (np.sum(U, axis=0)/np.sqrt(U.shape[0])).ravel()
         
         y = np.abs(u) # np.abs(np.sum(U, axis=0) / np.sqrt(U.shape[0]))
+        #print('\nchecking np.angle(U):', np.sum(np.angle(np.sum(U, axis=0)).ravel() \
+                #                                           - np.angle(u)))
         
-        print('y sum:', np.sum(y))
+        #print('y sum:', np.sum(y))
         # look for forbidden reflections where e1_inf != 1
-        forbidden   = (y < 1000*self.alpha) * (self.e1_inf != 1).ravel()
+        forbidden   = (y < 10000*self.alpha) * (self.e1_inf == 0).ravel()
         
+        #t1 = time.time()
         # project onto xp yp
         #-----------------------------------------------
         xp, yp = project_2D_Ellipse_arrays_cython(self.e0.ravel(), self.e1.ravel(), 
                                                   x, y, 
-                                                  self.e0_inf.ravel(), self.e1_inf.ravel())
+                                                  self.e0_inf.ravel(), self.e1_inf.ravel(), 
+                                                  self.I0.ravel())
         
-        print('yp sum:', np.sum(yp))
+        #t2 = time.time()
+        #print('yp sum:', np.sum(yp))
         # xp yp --> modes
         #-----------------------------------------------
         # d *= xp / x
         #############
         out = modes.copy()
         out[: modes.shape[0]//2] *= (xp / (x + self.alpha)).reshape(D[0].shape)
-        print('D sum:', np.sum(np.abs(out[: modes.shape[0]//2])**2))
         
+        #print('\nnp.sum(np.abs(xp[self.e1_inf==1])**2):', np.sum(np.abs(xp[self.e1_inf.ravel()==1])**2))
+        #print('\nnp.sum(np.abs(out[: modes.shape[0]//2])**2):', np.sum(np.abs(out[: modes.shape[0]//2])**2))
         # u   *= yp / y
         # U[0] = u
         # U    = ifft(U)
         ################
         # for forbidden reflections be more careful 
-        angle = np.angle(u[forbidden])
+        angle         = np.angle(u[forbidden])
         up            = np.empty_like(u)
         up[forbidden] = yp[forbidden] * np.exp(1J * angle)
-        print('up sum:', np.sum(np.abs(up)**2))
         
         # for everything else just scale (this is much faster)
         up[~forbidden] = u[~forbidden] * yp[~forbidden] / (y[~forbidden] + self.alpha)
         
-        print('up sum:', np.sum(np.abs(up)**2))
+        #print('\nnp.sum((yp*np.sqrt(M * self.unit_cell_weighting) - self.amp)**2):',np.sum((yp * np.sqrt(4. * self.unit_cell_weighting).ravel()- self.amp.ravel())**2))
+        #print('\nnp.sum((np.abs(up)*np.sqrt(self.unit_cell_weighting) - self.amp)**2):',np.sum((np.abs(up) * np.sqrt(4. * self.unit_cell_weighting).ravel()- self.amp.ravel())**2))
+        #print('\nnp.sum((self.e1 - self.amp)**2):',np.sum((self.e1 - self.amp)**2))
+        #print('\nnp.sum((np.abs(up)[self.e1_inf==1])**2):',np.sum((np.abs(up)[self.e1_inf.ravel()==1])**2))
+        
         # un-rotate
         #out[modes.shape[0]//2 :] = np.sqrt(U.shape[0])*np.fft.ifftn(u, axes=(0,)).reshape(D.shape)
         out[modes.shape[0]//2 :] += (up - u).reshape(D[0].shape) / np.sqrt(U.shape[0])
+        #print('\nnp.sum((np.abs(Bmodes)*np.sqrt(self.unit_cell_weighting) - self.amp)**2):',np.sum((np.abs(np.sum(out[modes.shape[0]//2 :], axis=0)) * np.sqrt(self.unit_cell_weighting)- self.amp)**2))
         
+        # check
+        #print('\nchecking np.abs(U):', np.sum(np.abs(np.sum(out[modes.shape[0]//2 :], axis=0)).ravel()  \
+                #                                      / np.sqrt(U.shape[0]) - np.abs(up)))
+        #print('\nchecking np.angle(U):', np.sum( (np.angle(up) - np.angle(u))[(np.abs(up)>1.0)*(np.abs(u)>1.0)] ))
+        #print('\nnp.angle(DU)[0]     :', np.angle(up)[0] - np.angle(u)[0])
+        #print('\nchecking np.angle(U):', np.sum((np.angle(np.sum(out[modes.shape[0]//2 :], axis=0)).ravel() \
+                #                                           - np.angle(u))[(np.abs(up)>1.0)*(np.abs(u)>1.0)]))
+        #print('\nchecking np.angle(U):', np.argmax((np.angle(np.sum(out[modes.shape[0]//2 :], axis=0)).ravel() \
+                #                                           - np.angle(u))*(np.abs(up)>1.0)*(np.abs(u)>1.0)))
         # store the latest eMod, but just use one mode to speed this up
-        delta     = modes[4] - out[4]
-        self.eMod = self.l2norm(delta, out[4])
+        #delta     = modes[4] - out[4]
+        #self.eMod = self.l2norm(delta, out[4])
+        
+        #print('\n', self.eMod)
+        #print('\neMod:', eMod)
         # check
         #print(' sum | sqrt(I) - sqrt(Imap) | : ', self.Emod(out))
         #print('Pmod -->  sum | modes - out | : ', np.sum( np.abs(modes - out) ))
+        #t3 = time.time()
+        #print('\nPmod:')
+        #print('total time  :', t3-t0)
+        #print('make xy time:', t1-t0)
+        #print('ellipse time:', t2-t1)
+        #print('apply mod time:', t3-t2)
+
         return out
 
     def Emod(self, modes):
         M         = self.Imap(modes)
-        eMod      = np.sum( self.mask * ( np.sqrt(M) - self.amp )**2 )
+        M         = self.mask * ( np.sqrt(M) - self.amp )**2
+        eMod      = np.sum( M )
         eMod      = np.sqrt( eMod / self.I_norm )
         
         #if eMod < 1.0e-1 :
@@ -393,7 +532,6 @@ class Mapper_ellipse():
         M        -= modes
         eSup      = np.sum( (M * M.conj() ).real ) 
         eSup      = np.sqrt( eSup / np.sum( (modes * modes.conj()).real ))
-        
         return eSup
 
     def finish(self, modes):
@@ -402,6 +540,8 @@ class Mapper_ellipse():
         self.O         = self.object(modes)
         out['support'] = self.voxel_support
         out['diff']    = self.Imap(modes)
+        out['mask']    = self.mask
+        out['amp_diff'] = self.mask * (self.amp**2 - out['diff'])
         return out
 
     def l2norm(self, delta, array0):
@@ -634,7 +774,7 @@ class Mapper_ellipse():
         s1 = np.fft.ifftn(s1)
         
         info = {}
-        info['eMod'] = [errors[i, j, k]]
+        info['eMod'] = [self.Emod(modes)]
         info['error_map'] = errors
         info['eCon'] = [self.l2norm(self.modes - modes, modes)]
         info.update(self.finish(modes))
@@ -676,15 +816,15 @@ def choose_N_highest_pixels(array, N, tol = 1.0e-10, maxIters=1000, mapper = Non
         # of the M symmetry related units 
         # then do not update 
         max_support = syms[0] == np.max(syms, axis=0) 
-        a = array[max_support]
     else :
         max_support = np.ones(array.shape, dtype = np.bool)
-        a = array
     
     if support is not None and support is not 1 :
-        a = array[support > 0]
+        sup = support
+        a = array[(max_support > 0) * (support > 0)]
     else :
-        support = 1
+        sup = 1
+        a = array[(max_support > 0)]
     
     # search for the cutoff value
     s0 = array.max()
@@ -707,20 +847,20 @@ def choose_N_highest_pixels(array, N, tol = 1.0e-10, maxIters=1000, mapper = Non
         #print(s, s0, s1, e)
         if np.abs(s0 - s1) < tol and np.abs(e) > 0 :
             failed = True
-            print('s0==s1, exiting...')
+            print('s0==s1, exiting...', s0, s1)
             break
         
-    S = (array > s) * max_support * support
+    S = (array > s) * max_support * sup
     
     # if failed is True then there are a lot of 
     # entries in a that equal s
     if failed :
-        print('failed, sum(max_support), sum(S), voxels:',np.sum(max_support), np.sum(S), N)
+        print('failed, sum(max_support), sum(S), voxels, pixels>0:',np.sum(max_support), np.sum(S), N, np.sum(array>0), len(a>0))
         # if S is less than the 
         # number of voxels then include 
         # some of the pixels where array == s
         count      = np.sum(S)
-        ii, jj, kk = np.where(np.abs(array-s)<=tol)
+        ii, jj, kk = np.where((np.abs(array-s)<=tol) * (max_support * support > 0))
         l          = N - count
         print(count, N, l, len(ii))
         if l > 0 :
