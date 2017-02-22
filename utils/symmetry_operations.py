@@ -6,6 +6,7 @@ from __future__ import unicode_literals
 import numpy as np
 import math
 from itertools import product
+from functools import reduce
 
 
 class P1():
@@ -113,13 +114,15 @@ class P212121():
     """
     def __init__(self, unitcell_size, det_shape, dtype=np.complex128):
         # only calculate the translations when they are needed
-        self.translations = None
+        self.translations      = None
+        self.translations_conj = None
+        self.no_solid_units = 4
         
         self.unitcell_size = unitcell_size
         self.det_shape     = det_shape
         
         # keep an array for the 4 symmetry related coppies of the solid unit
-        self.syms = np.zeros((4,) + tuple(det_shape), dtype=dtype)
+        #self.syms = np.zeros((4,) + tuple(det_shape), dtype=dtype)
 
     def make_Ts(self):
         det_shape     = self.det_shape
@@ -133,71 +136,106 @@ class P212121():
         T2 = T_fourier(det_shape, [0.0, unitcell_size[1]/2., unitcell_size[2]/2.])
         # x = 0.5 - x, -y, 0.5 + z
         T3 = T_fourier(det_shape, [unitcell_size[0]/2., 0.0, unitcell_size[2]/2.])
-        self.translations = np.array([T0, T1, T2, T3])
+        self.translations      = np.array([T0, T1, T2, T3])
+        self.translations_conj = self.translations.conj()
     
-    def solid_syms_Fourier(self, solid, apply_translation = True):
-        self.syms = self.syms.astype(solid.dtype)
-        
+    def solid_syms_Fourier(self, solid, apply_translation = True, syms = None):
+        if syms is None :
+            syms = np.empty((4,) + solid.shape, dtype=solid.dtype) # syms 
+
         # x = x
-        self.syms[0] = solid
+        syms[0] = solid
         
         # x = 0.5 + x, 0.5 - y, -z
-        self.syms[1][:, 0, :]  = solid[:, 0, :]
-        self.syms[1][:, 1:, :] = solid[:, -1:0:-1, :]
-        self.syms[1][:, :, 1:] = self.syms[1][:, :, -1:0:-1]
+        syms[1][:, 0, :]  = solid[:, 0, :]
+        syms[1][:, 1:, :] = solid[:, -1:0:-1, :]
+        syms[1][:, :, 1:] = syms[1][:, :, -1:0:-1]
         
         # x = -x, 0.5 + y, 0.5 - z
-        self.syms[2][0, :, :]  = solid[0, :, :]
-        self.syms[2][1:, :, :] = solid[-1:0:-1, :, :]
-        self.syms[2][:, :, 1:] = self.syms[2][:, :, -1:0:-1]
+        syms[2][0, :, :]  = solid[0, :, :]
+        syms[2][1:, :, :] = solid[-1:0:-1, :, :]
+        syms[2][:, :, 1:] = syms[2][:, :, -1:0:-1]
         
         # x = 0.5 - x, -y, 0.5 + z
-        self.syms[3][0, :, :]  = solid[0, :, :]
-        self.syms[3][1:, :, :] = solid[-1:0:-1, :, :]
-        self.syms[3][:, 1:, :] = self.syms[3][:, -1:0:-1, :]
+        syms[3][0, :, :]  = solid[0, :, :]
+        syms[3][1:, :, :] = solid[-1:0:-1, :, :]
+        syms[3][:, 1:, :] = syms[3][:, -1:0:-1, :]
         
         if apply_translation :
             if self.translations is None :
                 self.make_Ts()
             
-            self.syms *= self.translations
-        return self.syms
+            syms *= self.translations
+        return syms
 
-    def unflip_modes_Fourier(self, U, apply_translation=True):
-        U_inv = U.copy()
-        
-        if apply_translation :
-            if self.translations is None :
-                self.make_Ts()
-            
-            U_inv *= self.translations.conj()
+    def solid_syms_Fourier_masked(self, solid, i, j, k, apply_translation = True, syms = None):
+        """
+        solid = full solid unit at the detector
+        syms  = masked syms  
+        """
+        if syms is None :
+            syms = np.empty((4,) + i.shape, dtype=solid.dtype) # syms 
         
         # x = x
-        U_inv[0] = U_inv[0]
+        syms[0] = solid[(i,j,k)]
         
         # x = 0.5 + x, 0.5 - y, -z
-        U_inv[1][:, 0, :]  = U_inv[1][:, 0, :]
+        syms[1] = solid[(i, -j, -k)]
+        
+        # x = -x, 0.5 + y, 0.5 - z
+        syms[2] = solid[(-i, j, -k)]
+        
+        # x = 0.5 - x, -y, 0.5 + z
+        syms[3] = solid[(-i, -j, k)]
+        
+        if apply_translation :
+            if self.translations is None :
+                self.make_Ts()
+            
+            for ii in range(4):
+                syms[ii] *= self.translations[ii][(i,j,k)]
+        
+        return syms
+
+    def unflip_modes_Fourier(self, U, apply_translation=True, inplace = False):
+        if inplace :
+            U_inv = U
+        else :
+            U_inv = U.copy()
+        
+        if apply_translation :
+            if self.translations is None :
+                self.make_Ts()
+            
+            U_inv *= self.translations_conj
+        
+        # x = x
+        #U_inv[0] = U_inv[0]
+        
+        # x = 0.5 + x, 0.5 - y, -z
+        #U_inv[1][:, 0, :]  = U_inv[1][:, 0, :]
         U_inv[1][:, 1:, :] = U_inv[1][:, -1:0:-1, :]
         U_inv[1][:, :, 1:] = U_inv[1][:, :, -1:0:-1]
 
         # x = -x, 0.5 + y, 0.5 - z
-        U_inv[2][0, :, :]  = U_inv[2][0, :, :]
+        #U_inv[2][0, :, :]  = U_inv[2][0, :, :]
         U_inv[2][1:, :, :] = U_inv[2][-1:0:-1, :, :]
         U_inv[2][:, :, 1:] = U_inv[2][:, :, -1:0:-1]
         
         # x = 0.5 - x, -y, 0.5 + z
-        U_inv[3][0, :, :]  = U_inv[3][0, :, :]
+        #U_inv[3][0, :, :]  = U_inv[3][0, :, :]
         U_inv[3][1:, :, :] = U_inv[3][-1:0:-1, :, :]
         U_inv[3][:, 1:, :] = U_inv[3][:, -1:0:-1, :]
 
         return U_inv
 
-    def solid_syms_real(self, solid):
+    def solid_syms_real(self, solid, syms=None):
         """
         This uses pixel shifts (not phase ramps) for translation.
         Therefore sub-pixel shifts are ignored.
         """
-        syms = np.empty((4,) + solid.shape, dtype=solid.dtype) # self.syms 
+        if syms is None :
+            syms = np.empty((4,) + solid.shape, dtype=solid.dtype) # self.syms 
         
         # x = x
         syms[0] = solid
@@ -224,9 +262,9 @@ class P212121():
         
         for i, t in enumerate(translations):
             syms[i+1] = multiroll(syms[i+1], t)
-        return syms.copy()
+        return syms
 
-    def solid_syms_crystal_real(self, solid):
+    def solid_to_crystal_real(self, solid, return_unit=False):
         """
         Generate the symmetry related copies of the real-space solid unit
         in the crystal. This includes all symmetry related coppies of the 
@@ -239,29 +277,36 @@ class P212121():
         
         # get the symmetry related coppies of solid in the unit-cell
         # hopefully these fit in the field-of-view...
-        syms = self.solid_syms_real(solid)
-
+        U = np.sum(self.solid_syms_real(solid), axis=0)
+        
         # un-fftshift them
-        syms = np.fft.fftshift(syms, axes=(1,2,3))
+        U = np.fft.fftshift(U)
         
-        # now translate each solid sym by tiles in each dimension, this could really blow up...
-        syms_crystal = np.zeros( (len(syms) * np.prod(tiles),) + syms.shape[1:], dtype=syms.dtype)
-        syms_crystal[: len(syms)] = syms
+        # now translate the unit-cell by tiles in each dimension
+        C = U.copy()
+
+        # temp array to speed up multiroll_nowrap
+        t = np.asarray(np.zeros_like(U))
         
-        index = len(syms)
-        for sym in syms :
-            for i in (np.arange(tiles[0]) - tiles[0]//2):
-                for j in (np.arange(tiles[1]) - tiles[1]//2):
-                    for k in (np.arange(tiles[2]) - tiles[2]//2):
-                        if i == 0 and j == 0 and k == 0 :
-                            continue
-                        shift = np.array([i, j, k]) * np.array(self.unitcell_size)
-                        #print(i,j,k, shift, index)
-                        syms_crystal[index] = multiroll_nowrap(sym, shift)
-                        index += 1
+        for i in (np.arange(tiles[0]) - tiles[0]//2):
+            for j in (np.arange(tiles[1]) - tiles[1]//2):
+                for k in (np.arange(tiles[2]) - tiles[2]//2):
+                    if i == 0 and j == 0 and k == 0 :
+                        continue
+                    
+                    shift = np.array([i, j, k]) * np.array(self.unitcell_size)
+                    
+                    #print(i,j,k, shift, U.shape)
+                    #print(i,j,k, shift, index)
+                    C += multiroll_nowrap(U, shift, y = t)
         
-        syms_crystal = np.fft.ifftshift(syms_crystal, axes=(1,2,3))
-        return syms_crystal
+        # re-fftshift them
+        C = np.fft.ifftshift(C)
+        
+        if return_unit :
+            return C, np.fft.ifftshift(U)
+        else :
+            return C
 
 
 def test_P212121():
@@ -331,19 +376,30 @@ def T_fourier(shape, T, is_fft_shifted = True):
     e - 2pi i n m / N 
     """
     # make i, j, k for each pixel
-    i = np.fft.fftfreq(shape[0]) 
-    j = np.fft.fftfreq(shape[1])
-    k = np.fft.fftfreq(shape[2])
-    i, j, k = np.meshgrid(i, j, k, indexing='ij')
-
+    if T[0] != 0 :
+        i = np.fft.fftfreq(shape[0]) 
+        i = np.exp(- 2J * np.pi * i * T[0])
+    else :
+        i = np.ones((shape[0],), dtype=np.float)
+    
+    if T[1] != 0 :
+        j = np.fft.fftfreq(shape[1])
+        j = np.exp(- 2J * np.pi * j * T[1])
+    else :
+        j = np.ones((shape[1],), dtype=np.float)
+    
+    if T[2] != 0 :
+        k = np.fft.fftfreq(shape[2])
+        k = np.exp(- 2J * np.pi * k * T[2])
+    else :
+        k = np.ones((shape[2],), dtype=np.float)
+    
+    phase_ramp = reduce(np.multiply.outer, [i, j, k])
+    
     if is_fft_shifted is False :
-        i = np.fft.ifftshift(i)
-        j = np.fft.ifftshift(j)
-        k = np.fft.ifftshift(k)
-
-    phase_ramp = np.exp(- 2J * np.pi * (i * T[0] + j * T[1] + k * T[2]))
+        phase_ramp = np.fft.ifftshift(phase_ramp)
+           
     return phase_ramp
-
 
 def solid_syms(solid_unit, unitcell_size, det_shape):
     """
@@ -503,7 +559,7 @@ def multiroll(x, shift, axis=None):
 
     return y
 
-def multiroll_nowrap(x, shift, axis=None):
+def multiroll_nowrap(x, shift, axis=None, y = None):
     """Roll an array along each axis.
 
     Thanks to: Warren Weckesser, 
@@ -602,7 +658,10 @@ def multiroll_nowrap(x, shift, axis=None):
     shift = np.take(shift, np.argsort(axis))
 
     # Create the output array, and copy the shifted blocks from x to y.
-    y = np.zeros_like(x)
+    if y is None :
+        y = np.zeros_like(x)
+    else :
+        y.fill(0)
     src_slices = [(slice(-shft, n),) if shft < 0 else (slice(0, n-shft),)
                   for shft, n in zip(shift, x.shape)]
     dst_slices = [(slice(0, n+shft),) if shft < 0 else (slice(shft, n),)
@@ -614,7 +673,7 @@ def multiroll_nowrap(x, shift, axis=None):
 
     return y
 
-def lattice(unit_cell_size, shape):
+def lattice_old(unit_cell_size, shape):
     """
     We should just have delta functions at 1/d
     however, if the unit cell does not divide the 
@@ -639,5 +698,40 @@ def lattice(unit_cell_size, shape):
         j = np.argmin(np.abs(jj - qj))
         k = np.argmin(np.abs(kk - qk))
         lattice[i, j, k] = 1.
+    
+    return lattice
+
+def lattice(unit_cell_size, shape):
+    """
+    We should just have delta functions at 1/d
+    however, if the unit cell does not divide the 
+    detector shape evenly then these fall between 
+    pixels. 
+    """
+    lattice = np.zeros(shape, dtype=np.float)
+
+    # generate the q-space coordinates
+    qi = np.fft.fftfreq(shape[0])
+    qj = np.fft.fftfreq(shape[1])
+    qk = np.fft.fftfreq(shape[2])
+    
+    ui = np.fft.fftfreq(unit_cell_size[0])
+    uj = np.fft.fftfreq(unit_cell_size[1])
+    uk = np.fft.fftfreq(unit_cell_size[2])
+
+    i = np.zeros_like(qi)
+    j = np.zeros_like(qj)
+    k = np.zeros_like(qk)
+    
+    for ii in ui :
+        i[np.argmin(np.abs(ii - qi))] = 1.
+    for jj in uj :
+        j[np.argmin(np.abs(jj - qj))] = 1.
+    for kk in uk :
+        k[np.argmin(np.abs(kk - qk))] = 1.
+
+    lattice = reduce(np.multiply.outer, [i, j, k])
+    
+    #print(np.allclose(lattice, lattice_old(unit_cell_size, shape)))
     
     return lattice

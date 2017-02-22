@@ -1,4 +1,42 @@
+#!/usr/bin/env python
+
+# for python 2 / 3 compatibility
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+
+try :
+    range = xrange
+except NameError :
+    pass
+
+try :
+    import ConfigParser as configparser 
+except ImportError :
+    import configparser 
+
 import numpy as np
+
+def isValid(thing, d=None):
+    """
+    checks if 'thing' is valid. If d (a dictionary is not None) then
+    check if d['thing'] is valid.
+    """
+    valid = False
+    
+    if d is not None :
+        if thing not in d.keys():
+            return valid 
+        else :
+            thing2 = d[thing]
+    else :
+        thing2 = thing
+    
+    if thing2 is not None and thing2 is not False :
+        valid = True
+    
+    return valid
 
 def parse_cmdline_args():
     import argparse
@@ -94,7 +132,7 @@ def if_exists_del(fnam):
     # see if it exists and if so delete it 
     # (probably dangerous but otherwise this gets really anoying for debuging)
     if os.path.exists(fnam):
-        print '\n', fnam ,'file already exists, deleting the old one and making a new one'
+        print('\n', fnam ,'file already exists, deleting the old one and making a new one')
         os.remove(fnam)
 
 """
@@ -135,24 +173,21 @@ def write_input_output_h5(fnam, **kwargs):
     import h5py
     if_exists_del(fnam)
     
-    print '\nwriting input/output file:', fnam
+    print('\nwriting input/output file:', fnam)
     f = h5py.File(fnam, 'w')
     for key, value in kwargs.iteritems():
         if value is None :
             continue 
         if key == 'config_file' :
-            print 'writing config file:', key
+            print('writing config file:', key)
             g = open(value).readlines()
             h = ''
             for line in g:
                 h += line
             f.create_dataset('config_file', data = np.array(h))
             f.create_dataset('config_file_name', data = np.array(value))
-        elif value.dtype == bool :
-            print 'writing:', key, value.shape, value.dtype
-            f.create_dataset(key, data = value.astype(np.int16))
         else :
-            print 'writing:', key, value.shape, value.dtype
+            print('writing:', key, value.shape, value.dtype)
             f.create_dataset(key, data = value)
     
     f.close()
@@ -177,7 +212,7 @@ def read_input_output_h5(fnam):
     """
     import h5py
     
-    print '\nreading input/output file:', fnam
+    print('\nreading input/output file:', fnam)
     f = h5py.File(fnam, 'r')
     
     kwargs = {}
@@ -185,31 +220,22 @@ def read_input_output_h5(fnam):
         if key == 'config_file':
             config_file = f[key].value
             
-            print 'parsing the config_file...'
+            print('parsing the config_file...')
             # read then pass the config file
-            import ConfigParser
             import StringIO
             config_file = StringIO.StringIO(config_file)
             
-            config = ConfigParser.ConfigParser()
+            config = configparser.ConfigParser()
             config.readfp(config_file)
             params = parse_parameters(config)
             
             kwargs[key] = params
         else :
-            print 'reading:', key,
+            print('reading:', key, end=' ')
             
             value = f[key].value
             kwargs[key] = value
             
-            print value.dtype, value.shape
+            print(value.dtype, value.shape)
     f.close()
-    
-    if 'sample_support' in kwargs.keys():
-        kwargs['sample_support'] = kwargs['sample_support'].astype(np.bool)
-        print 'sample_support np.int16 --> np.bool'
-    
-    if 'good_pix' in kwargs.keys():
-        kwargs['good_pix'] = kwargs['good_pix'].astype(np.bool)
-        print 'good_pix np.int16 --> np.bool'
     return kwargs

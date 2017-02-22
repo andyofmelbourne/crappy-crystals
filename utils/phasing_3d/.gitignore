@@ -1,0 +1,15 @@
+*.dat
+*.bin
+*.log
+*.txt
+*.out
+.*.out
+*.lst
+data
+probsum/
+logs/
+*.png
+*.raw
+*.swp
+*.pyc
+*.h5
