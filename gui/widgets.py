@@ -563,7 +563,7 @@ class Forward_model_widget(QtGui.QWidget):
             # real-space crystal view 
             #########################
             #cryst = self.f['/forward_model/solid_unit'][()].real
-            cryst = self.f[self.crystal_path][()].real
+            cryst = np.abs(self.f[self.crystal_path][()])
             #cryst = np.fft.fftshift(cryst)
             # add 10 pix padding
             padd = np.zeros((10, cryst.shape[0]), dtype=cryst.real.dtype)
@@ -695,7 +695,7 @@ class Phase_widget(QtGui.QWidget):
             # real-space crystal view 
             #########################
             #cryst = self.f['/forward_model/solid_unit'][()].real
-            cryst = self.f[self.crystal_path][()].real
+            cryst = np.abs(self.f[self.crystal_path][()])
             #cryst = np.fft.fftshift(cryst)
             # add 10 pix padding
             padd = np.zeros((10, cryst.shape[0]), dtype=cryst.real.dtype)

@@ -226,8 +226,9 @@ def DM(iters, beta = 1, **args):
     info['eMod']  = eMods
     info['eCon']  = eCons
     
-    a = mapper.Pmod(modes_sup + 1/beta * (modes_sup - modes))
-    info.update(mapper.finish(a))
+    #a = mapper.Pmod(modes_sup + 1/beta * (modes_sup - modes))
+    b = mapper.Psup(modes_mod - 1/beta * (modes_mod - modes))
+    info.update(mapper.finish(b))
     
     O = mapper.O
     

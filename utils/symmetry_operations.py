@@ -119,23 +119,29 @@ class P212121():
         self.no_solid_units = 4
         
         self.unitcell_size = unitcell_size
+        self.Cheshire_cell = (unitcell_size[0]//2, unitcell_size[1]//2,unitcell_size[2]//2)
         self.det_shape     = det_shape
         
         # keep an array for the 4 symmetry related coppies of the solid unit
         #self.syms = np.zeros((4,) + tuple(det_shape), dtype=dtype)
 
     def make_Ts(self):
+        """
+        For infinite crystals we are free to add +- a,b or c to 
+        each of the translations. For finite crystals this choise 
+        depends on the crystal model
+        """
         det_shape     = self.det_shape
         unitcell_size = self.unitcell_size
         # store the tranlation ramps
         # x = x
         T0 = np.ones(det_shape, dtype=np.complex128)
         # x = 0.5 + x, 0.5 - y, -z
-        T1 = T_fourier(det_shape, [unitcell_size[0]/2., unitcell_size[1]/2., 0.0])
+        T1 = T_fourier(det_shape, [-unitcell_size[0]/2., unitcell_size[1]/2., 0.0])
         # x = -x, 0.5 + y, 0.5 - z
-        T2 = T_fourier(det_shape, [0.0, unitcell_size[1]/2., unitcell_size[2]/2.])
+        T2 = T_fourier(det_shape, [0.0, -unitcell_size[1]/2., unitcell_size[2]/2.])
         # x = 0.5 - x, -y, 0.5 + z
-        T3 = T_fourier(det_shape, [unitcell_size[0]/2., 0.0, unitcell_size[2]/2.])
+        T3 = T_fourier(det_shape, [unitcell_size[0]/2., 0.0, -unitcell_size[2]/2.])
         self.translations      = np.array([T0, T1, T2, T3])
         self.translations_conj = self.translations.conj()
     
@@ -256,9 +262,9 @@ class P212121():
         syms[3][:, 1:, :] = syms[3][:, -1:0:-1, :]
         
         translations = []
-        translations.append([self.unitcell_size[0]//2, self.unitcell_size[1]//2, 0])
-        translations.append([0, self.unitcell_size[1]//2, self.unitcell_size[2]//2])
-        translations.append([self.unitcell_size[0]//2, 0, self.unitcell_size[2]//2])
+        translations.append([-self.unitcell_size[0]//2, self.unitcell_size[1]//2, 0])
+        translations.append([0, -self.unitcell_size[1]//2, self.unitcell_size[2]//2])
+        translations.append([self.unitcell_size[0]//2, 0, -self.unitcell_size[2]//2])
         
         for i, t in enumerate(translations):
             syms[i+1] = multiroll(syms[i+1], t)
