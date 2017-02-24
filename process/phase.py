@@ -206,6 +206,7 @@ if __name__ == '__main__':
         del f[key]
     f[key] = mapper.sym_ops.solid_to_crystal_real(O)
 
+    """
     # e0
     key = group+'/e0'
     if key in f :
@@ -229,6 +230,7 @@ if __name__ == '__main__':
     if key in f :
         del f[key]
     f[key] = mapper.e1_inf
+    """
     
     # mask * (sqrt(M) - amp)**2
     #key = group+'/diff_amp'
@@ -243,10 +245,10 @@ if __name__ == '__main__':
     #f[key] = (mapper.yp - mapper.amp)
 
     # I0
-    key = group+'/I0'
-    if key in f :
-        del f[key]
-    f[key] = mapper.I0
+    #key = group+'/I0'
+    #if key in f :
+    #    del f[key]
+    #f[key] = mapper.I0
 
     del info['eMod']
     del info['eCon']

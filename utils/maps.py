@@ -135,11 +135,14 @@ class Mapper_ellipse():
             print(np.sum(self.mask), 'good pixels')
             print(self.mask.dtype, 'good pixels dtype')
         
+        self.mask = self.mask.astype(np.uint8)
+
         self.alpha = 1.0e-10
         if isValid('alpha', args):
             self.alpha = args['alpha']
         
         self.I_norm = (self.mask * I).sum()
+        self.I      = I.astype(dtype)
         self.amp    = np.sqrt(I.astype(dtype))
         
         # define the support projection
@@ -185,150 +188,8 @@ class Mapper_ellipse():
         #self.modes[self.modes.shape[0]//2:] = self.sym_ops.solid_syms_Fourier(Ohat, apply_translation = True, syms = self.modes[self.modes.shape[0]//2:])
         self.modes[self.modes.shape[0]//2:] = self.sym_ops.solid_syms_Fourier(Ohat, apply_translation = True)
         
-        # Ellipse axes
-        #-----------------------------------------------
-        # Here we have :
-        # (x / e0)**2 + (y / e1)**2 = 1 , where
-        # 
-        # e0 = sqrt{ self.diffuse_weighting / I } and
-        # 
-        # e1 = sqrt{ self.unit_cell_weighting / I }
-        # 
-        # we need to know for which pixels:
-        # e_0/1 -> inf
-        #-----------------------------------------------
-        
-        tol = 1.0e-10
-        
-        self.e0     = np.zeros_like(self.diffuse_weighting)
-        self.e0_inf = np.zeros(self.diffuse_weighting.shape, dtype = np.bool)
-        
-        self.e1     = np.zeros_like(self.diffuse_weighting)
-        self.e1_inf = np.zeros(self.diffuse_weighting.shape, dtype = np.bool)
-        
-        # look for special cases
-        D0 = (self.diffuse_weighting   <= tol)
-        B0 = (self.unit_cell_weighting <= tol)
-        I0 = (I                        <= tol)
-        m  = self.mask > 0 
-
-        # 'normal, on Bragg, non-masked' D>0, B>0, I>0, m != 0
-        # and
-        # 'noisey, on Bragg, non-masked' D>0, B>0, I=0, m != 0
-        i = (~D0)*(~B0)*m
-        print(i.shape, i.dtype, np.sum(i))
-        self.e0[i] = np.sqrt(I[i]) / np.sqrt(self.diffuse_weighting[i])
-        self.e1[i] = np.sqrt(I[i]) / np.sqrt(self.sym_ops.no_solid_units * self.unit_cell_weighting[i])
-        
-        self.e0_inf[i] = False
-        self.e1_inf[i] = False
-        print(np.sum(i), 'normal / noisey, diffuse, on Bragg, non-masked pixels')
-        
-        # 'normal, off Bragg, non-masked' D>0, B=0, I>0, m != 0
-        # and
-        # 'noisey, off Bragg, non-masked' D>0, B=0, I=0, m != 0
-        i = (~D0)*(B0)*m
-        self.e0[i] = np.sqrt(I[i]) / np.sqrt(self.diffuse_weighting[i])
-        self.e1[i] = np.inf
-        
-        self.e0_inf[i] = False
-        self.e1_inf[i] = True
-        print(np.sum(i), 'normal / noisey, diffuse, off Bragg, non-masked pixels')
-        
-        
-        # 'normal, no diffuse, on Bragg, non-masked' D=0, B>0, I>0, m != 0
-        # and
-        # 'noisey, no diffuse, on Bragg, non-masked' D=0, B>0, I=0, m != 0
-        i = (D0)*(~B0)*m
-        self.e0[i] = np.inf
-        self.e1[i] = np.sqrt(I[i]) / np.sqrt(self.sym_ops.no_solid_units * self.unit_cell_weighting[i])
-        
-        self.e0_inf[i] = True
-        self.e1_inf[i] = False
-        print(np.sum(i), 'normal / noisey, no diffuse, on Bragg, non-masked pixels')
-
-        # 'masked' D>=0, B>=0, I>=0, m = 0
-        if m is not 1 and m is not True :
-            i = ~m
-            self.e0[i] = np.inf
-            self.e1[i] = np.inf
-             
-            self.e0_inf[i] = True
-            self.e1_inf[i] = True
-            print(np.sum(i), 'masked pixels')
-
-        # test: try masking pixels for which D>0 or B>0 and I==0 
-        i = (D0 + B0)*(I0)*m
-        self.e0[i] = np.inf
-        self.e1[i] = np.inf
-         
-        self.e0_inf[i] = True
-        self.e1_inf[i] = True
-        self.mask[i] = False
-
-        # 'everything zero pixels' D=0, B=0, I=0 non-masked
-        i = (D0)*(B0)*(I0)*m
-        self.e0[i] = 0.
-        self.e1[i] = 0.
-         
-        self.e0_inf[i] = True
-        self.e1_inf[i] = True
-        print(np.sum(i), 'everything zero pixels')
-        
-        # 'weired pixels' D=0, B=0, I>=0 non-masked
-        # for now raise an exception if there are any of these
-        i = (D0)*(B0)*(~I0)*m
-        if np.sum(i) > 0 :
-            raise ValueError('Error diffuse and unit-cell weighting are zero on a pixel with positive intensity')
-
-        self.e0_inf = self.e0_inf.astype(np.uint8)
-        self.e1_inf = self.e1_inf.astype(np.uint8)
-        self.I0     = I0.astype(np.uint8)
-        """
-        # floating point tolerance for 1/x (log10)  
-        tol = 10. #1.0e+15
-        
-        # check for numbers close to infinity in sqrt(I / self.diffuse_weighting)
-        #m = (self.diffuse_weighting <= 10.**(-tol)) + (I <= 10.**(-tol))
-        #m[~m] = (0.5 * (np.log10(I[~m]) - np.log10(self.diffuse_weighting[~m])) >= tol) 
-        self.I0 = (I <= 10.**(-tol)) 
-        
-        # e0 is infinite when the weighting factor is really small
-        self.e0_inf   = np.zeros(self.diffuse_weighting.shape, dtype = np.bool)
-        self.e0_inf[ (self.diffuse_weighting <= 10.**(-tol)) ] = True
-        
-        # set e0 to >0 for pixels where I>0 and diffuse>0
-        self.e0    = np.zeros_like(self.diffuse_weighting)
-        m          = (I>= 10.**(-tol)) * ~self.e0_inf
-        self.e0[m] = np.sqrt(I[m]) / np.sqrt(self.diffuse_weighting[m])
-        
-        # set e0 for pixels where I~0
-        m = (I <= 10.**(-tol))
-        self.e0[m]  = 0.
-               
-        # e1 is infinite when the weighting factor is really small
-        self.e1_inf   = np.zeros(self.unit_cell_weighting.shape, dtype = np.bool)
-        self.e1_inf[ (self.unit_cell_weighting <= 10.**(-tol)) ] = True
-        
-        # set e1 to >0 for pixels where I>0 and Bragg>0
-        self.e1    = np.zeros_like(self.unit_cell_weighting)
-        m          = (I>= 10.**(-tol)) * ~self.e1_inf
-        self.e1[m] = np.sqrt(I[m]) / np.sqrt(self.sym_ops.no_solid_units * self.unit_cell_weighting[m])
-        
-        # set e0 for pixels where I~0
-        m = (I <= 10.**(-tol))
-        self.e1[m]  = 0.
-        
-        print('number of good pixels for elliptical projections: e0, e1, both', np.sum(~self.e0_inf), np.sum(~self.e1_inf), np.sum(~self.e1_inf * ~self.e0_inf))
-        """
-        
         self.iters = 0
-        
-        # check that self.Imap == I * (x/e_0)**2 + (y/e_1)**2
-        # or that (x/e_0)**2 + (y/e_1)**2 = 1
-        print('eMod(modes0):', self.Emod(self.modes))
 
-         
     def object(self, modes):
         out = np.fft.ifftn(modes[0])
         return out
@@ -442,15 +303,15 @@ class Mapper_ellipse():
         
         #print('y sum:', np.sum(y))
         # look for forbidden reflections where e1_inf != 1
-        forbidden   = (y < 10000*self.alpha) * (self.e1_inf == 0).ravel()
+        forbidden   = (y < 10000*self.alpha) 
         
         #t1 = time.time()
         # project onto xp yp
         #-----------------------------------------------
-        xp, yp = project_2D_Ellipse_arrays_cython(self.e0.ravel(), self.e1.ravel(), 
-                                                  x, y, 
-                                                  self.e0_inf.ravel(), self.e1_inf.ravel(), 
-                                                  self.I0.ravel())
+        xp, yp = project_2D_Ellipse_arrays_cython(x, y, 
+                                                  self.diffuse_weighting.ravel(), self.unit_cell_weighting.ravel(), 
+                                                  self.I.ravel(),
+                                                  self.mask.ravel())
         
         #t2 = time.time()
         #print('yp sum:', np.sum(yp))
@@ -473,7 +334,7 @@ class Mapper_ellipse():
         up[forbidden] = yp[forbidden] * np.exp(1J * angle)
         
         # for everything else just scale (this is much faster)
-        up[~forbidden] = u[~forbidden] * yp[~forbidden] / (y[~forbidden] + self.alpha)
+        up[~forbidden] = u[~forbidden] * yp[~forbidden] / y[~forbidden]
         
         #print('\nnp.sum((yp*np.sqrt(M * self.unit_cell_weighting) - self.amp)**2):',np.sum((yp * np.sqrt(4. * self.unit_cell_weighting).ravel()- self.amp.ravel())**2))
         #print('\nnp.sum((np.abs(up)*np.sqrt(self.unit_cell_weighting) - self.amp)**2):',np.sum((np.abs(up) * np.sqrt(4. * self.unit_cell_weighting).ravel()- self.amp.ravel())**2))
@@ -715,8 +576,6 @@ class Mapper_ellipse():
         kk = kk[Bragg_mask]
         
         sBragg = s[Bragg_mask]
-        e0_inf = self.e0_inf[Bragg_mask] == 0 
-        e1_inf = self.e1_inf[Bragg_mask] == 0 
         modes  = np.empty((self.modes.shape[0],)+s[Bragg_mask].shape, dtype=self.modes.dtype)
         amp    = self.amp[Bragg_mask] 
         if self.mask is not 1 :
@@ -746,7 +605,7 @@ class Mapper_ellipse():
                     I += unit_cell_weighting * (U * U.conj()).real
                     
                     # Emod
-                    mask      = mask * e0_inf * e1_inf
+                    mask      = mask 
                     eMod      = np.sum( mask * ( np.sqrt(I) - amp )**2 )
                     eMod      = np.sqrt( eMod / I_norm )
 
