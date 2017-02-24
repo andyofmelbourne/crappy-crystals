@@ -94,6 +94,7 @@ def on_ellipse(xp, yp, e0_inf, e1_inf, I0, I, B, D):
     print('------------------------')
     print('mean   |D*xp**2 + B*yp**2 - I| :', np.mean(diff[(e0_inf == 0)*(e1_inf == 0)]))
     print('median |D*xp**2 + B*yp**2 - I| :', np.median(diff[(e0_inf == 0)*(e1_inf == 0)]))
+    return diff
 
 
 def dist_stats(xp, yp, e0_inf, e1_inf, I0, I, B, D):
@@ -190,29 +191,59 @@ if __name__ == '__main__':
     assert u == 1.6
     assert v == 0.3
     """
+    import time 
     
     print('\nOLD')
     print('Testing random numbers about 1:')
     print('-------------------------------')
-    x, y, e0, e1, e0_inf, e1_inf, I0, I, B, D = make_random_ellipses(shape = (10,))
+    x, y, e0, e1, e0_inf, e1_inf, I0, I, B, D = make_random_ellipses(shape = (15,), scale=1.0e10)
     mask = np.ones(x.shape, dtype=np.uint8)
     
+    t0 = time.time()
     xp, yp = project_2D_Ellipse_arrays_cython(e0, e1, x, y, e0_inf, e1_inf, I0)
-    on_ellipse(xp, yp, e0_inf, e1_inf, I0, I, B, D)
+    t1 = time.time()
+    dt_old = t1-t0
+    
+    diffs_old = on_ellipse(xp, yp, e0_inf, e1_inf, I0, I, B, D)
     
     dists_old = dist_stats(xp, yp, e0_inf, e1_inf, I0, I, B, D)
     xp_old, yp_old = xp.copy(), yp.copy()
 
     print('\nNEW')
+    t0 = time.time()
     xp, yp = project_2D_Ellipse_arrays_cython_test(x, y, D, B, I, mask)
-    on_ellipse(xp, yp, e0_inf, e1_inf, I0, I, B, D)
+    t1 = time.time()
+    dt_new = t1-t0
+    diffs_new = on_ellipse(xp, yp, e0_inf, e1_inf, I0, I, B, D)
 
     dists_new = dist_stats(xp, yp, e0_inf, e1_inf, I0, I, B, D)
 
     print('\nComparing distances:')
     print(np.sum(dists_old > dists_new), 'values are better in new') 
     print(np.sum(dists_new > dists_old), 'values are better in old') 
+    i = np.argmax(dists_new - dists_old)
+    print('\nindex', i, 'is the worst value:')
+    print('dist new:', dists_new[i]) 
+    print('dist old:', dists_new[i]) 
+    print('I', I[i], 'D', D[i], 'B', B[i], 'x', x[i], 'y', y[i])
+    print('old xp, yp:', xp_old[i], yp_old[i])
+    print('new xp, yp:', xp[i], yp[i])
     
+    print('\nComparing diffs')
+    print(np.sum(diffs_old > diffs_new), 'values are better in new') 
+    print(np.sum(diffs_new > diffs_old), 'values are better in old') 
+    i = np.argmax(diffs_new - dists_old)
+    print('diff new:', diffs_new[i]) 
+    print('diff old:', diffs_new[i]) 
+    print('\nindex', i, 'is the worst value:')
+    print('I', I[i], 'D', D[i], 'B', B[i], 'x', x[i], 'y', y[i])
+    print('old xp, yp:', xp_old[i], yp_old[i])
+    print('new xp, yp:', xp[i], yp[i])
+
+    print('\nComparing computation time')
+    print('old    :', dt_old)
+    print('new    :', dt_new)
+    print('old/new:', dt_old / dt_new)
 
     """
     print('\n\n*******************************')

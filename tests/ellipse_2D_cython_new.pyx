@@ -236,75 +236,83 @@ def project_2D_Ellipse_arrays_cython_test(np.ndarray[Ctype_float, ndim=1] x,
     cdef int x_inv = 0
     cdef int y_inv = 0
     cdef unsigned int ii_max = <unsigned int> x.shape[0]
-    cdef double s0, s1, s, ratio0, ratio1, g, n0, n1, r0, r1
-    cdef double ep0, ep1, tol, z0, z1, Ip, xp, yp, nn
+    cdef double Ii, Wxi, Wyi, s0, s1, s, ratio0, ratio1, g, n0, n1, r0, r1
+    cdef double e1_sq, e0_sq, one_on_ep1, one_on_ep0, ep0, ep1, tol, z0, z1, Ip, xp, yp, nn
     cdef np.ndarray[Ctype_float, ndim = 1] u = np.empty((ii_max), dtype=np.float)
     cdef np.ndarray[Ctype_float, ndim = 1] v = np.empty((ii_max), dtype=np.float)
     
     for ii in range(ii_max):
-        if mask[ii] == 0 or (Wx[ii] == 0 and Wy[ii] == 0):
+        Ii, Wxi, Wyi = I[ii], Wx[ii], Wy[ii]
+        if mask[ii] == 0 or (Wxi == 0 and Wyi == 0):
             u[ii] = x[ii]
             v[ii] = y[ii]
             continue
         
-        elif I[ii] == 0 :
-            u[ii] = 0.
-            v[ii] = 0.
+        elif Ii == 0 :
+            if Wxi == 0 :
+                u[ii] = x[ii]
+                v[ii] = 0.
+            elif Wyi == 0 :
+                u[ii] = 0.
+                v[ii] = y[ii]
+            else :
+                u[ii] = 0.
+                v[ii] = 0.
             continue
 
-        elif Wx[ii] == 0 :
+        elif Wxi == 0 :
             u[ii] = x[ii]
             if y[ii] < 0 :
                 # how do we know if this is safe?
-                v[ii] = -sqrt(I[ii])/sqrt(Wy[ii])
+                v[ii] = -sqrt(Ii)/sqrt(Wyi)
             else :
-                v[ii] =  sqrt(I[ii])/sqrt(Wy[ii])
+                v[ii] =  sqrt(Ii)/sqrt(Wyi)
             continue
         
-        elif Wy[ii] == 0 :
+        elif Wyi == 0 :
             v[ii] = y[ii]
             if x[ii] < 0 :
-                u[ii] = -sqrt(I[ii])/sqrt(Wx[ii])
+                u[ii] = -sqrt(Ii)/sqrt(Wxi)
             else :
-                u[ii] =  sqrt(I[ii])/sqrt(Wx[ii])
+                u[ii] =  sqrt(Ii)/sqrt(Wxi)
             continue
 
-        elif x[ii] == 0 and (Wx[ii] < Wy[ii]):
+        elif x[ii] == 0 and (Wxi < Wyi):
             if y[ii] < 0 :
-                y[ii] = -sqrt(I[ii])/sqrt(Wy[ii])
+                y[ii] = -sqrt(Ii)/sqrt(Wyi)
             else :
-                y[ii] =  sqrt(I[ii])/sqrt(Wy[ii])
+                y[ii] =  sqrt(Ii)/sqrt(Wyi)
             continue
         
-        elif y[ii] == 0 and (Wy[ii] < Wx[ii]):
+        elif y[ii] == 0 and (Wyi < Wxi):
             if x[ii] < 0 :
-                x[ii] = -sqrt(I[ii])/sqrt(Wx[ii])
+                x[ii] = -sqrt(Ii)/sqrt(Wxi)
             else :
-                x[ii] =  sqrt(I[ii])/sqrt(Wx[ii])
+                x[ii] =  sqrt(Ii)/sqrt(Wxi)
             continue
                  
         # transpose axes so that e0 > e1 
         # ------------------------------
-        if Wy[ii] >= Wx[ii] :
+        if Wyi >= Wxi :
             flipped = 0
-            ep0 = sqrt(I[ii])/sqrt(Wx[ii])
-            ep1 = sqrt(I[ii])/sqrt(Wy[ii])
-            one_on_ep0 = sqrt(Wx[ii])/sqrt(I[ii])
-            one_on_ep1 = sqrt(Wy[ii])/sqrt(I[ii])
-            e0_sq      = Wx[ii]/I[ii]
-            e1_sq      = Wy[ii]/I[ii]
-            r0 = Wy[ii]/Wx[ii]
+            ep0 = sqrt(Ii)/sqrt(Wxi)
+            ep1 = sqrt(Ii)/sqrt(Wyi)
+            one_on_ep0 = sqrt(Wxi)/sqrt(Ii)
+            one_on_ep1 = sqrt(Wyi)/sqrt(Ii)
+            e0_sq      = Wxi/Ii
+            e1_sq      = Wyi/Ii
+            r0 = Wyi/Wxi
             xp = x[ii]
             yp = y[ii]
         else :
             flipped = 1
-            ep0 = sqrt(I[ii])/sqrt(Wy[ii])
-            ep1 = sqrt(I[ii])/sqrt(Wx[ii])
-            one_on_ep1 = sqrt(Wx[ii])/sqrt(I[ii])
-            one_on_ep0 = sqrt(Wy[ii])/sqrt(I[ii])
-            e0_sq      = Wy[ii]/I[ii]
-            e1_sq      = Wx[ii]/I[ii]
-            r0 = Wx[ii]/Wy[ii]
+            ep0 = sqrt(Ii)/sqrt(Wyi)
+            ep1 = sqrt(Ii)/sqrt(Wxi)
+            one_on_ep1 = sqrt(Wxi)/sqrt(Ii)
+            one_on_ep0 = sqrt(Wyi)/sqrt(Ii)
+            e0_sq      = Wyi/Ii
+            e1_sq      = Wxi/Ii
+            r0 = Wxi/Wyi
             xp = y[ii]
             yp = x[ii]
             
@@ -337,9 +345,9 @@ def project_2D_Ellipse_arrays_cython_test(np.ndarray[Ctype_float, ndim=1] x,
             # change variables
             # ----------------
             # if x or y < tol then clip
-            tol = 1.0e-10
-            if yp < tol : yp = tol
-            if xp < tol : xp = tol
+            #tol = 1.0e-10
+            #if yp < tol : yp = tol
+            #if xp < tol : xp = tol
          
             z0 = xp * one_on_ep0
             z1 = yp * one_on_ep1
@@ -391,32 +399,36 @@ def project_2D_Ellipse_arrays_cython_test(np.ndarray[Ctype_float, ndim=1] x,
         
         # do an additional projection onto the ellipse surface
         # for numerical stability when xp or yp ~ 0
-        """
-        n0 = xp*one_on_ep0 
-        n1 = yp*one_on_ep1 
-        nn = float_max(n0, n1)
-        Ip = nn * sqrt((n0/nn)**2 + (n1/nn)**2)
-        if Ip != 1. :
-            print('Ip != 1', Ip)
-            xp /= Ip
-            yp /= Ip
-        """
+        #n0 = xp*one_on_ep0 
+        #n1 = yp*one_on_ep1 
+        #nn = float_max(n0, n1)
+        #Ip = nn * sqrt((n0/nn)**2 + (n1/nn)**2)
+        if flipped == 0 :
+            Ip = Wxi*xp**2 + Wyi*yp**2
+        else :
+            Ip = Wyi*xp**2 + Wxi*yp**2
+        
+        if Ip != Ii :
+            #print('Ip != 1', Ip)
+            Ip = sqrt(Ii) / sqrt(Ip)
+            xp *= Ip 
+            yp *= Ip
         
         # compare with Wx=0 projection
-        xp2 = xp
-        if flipped == 0 :
-            yp2 = sqrt(I[ii] - Wx[ii]*xp2**2)/sqrt(Wy[ii])
-        else :
-            yp2 = sqrt(I[ii] - Wy[ii]*xp2**2)/sqrt(Wx[ii])
+        #xp2 = xp
+        #if flipped == 0 :
+        #    yp2 = sqrt(I[ii] - Wx[ii]*xp2**2)/sqrt(Wy[ii])
+        #else :
+        #    yp2 = sqrt(I[ii] - Wy[ii]*xp2**2)/sqrt(Wx[ii])
 
         # uninvert
         if y_inv == 1 :
             yp  = -yp
-            yp2 = -yp2
+        #    yp2 = -yp2
             
         if x_inv == 1 :
             xp  = -xp
-            xp2 = -xp2
+        #    xp2 = -xp2
         
         # unflip
         if flipped :
@@ -424,28 +436,28 @@ def project_2D_Ellipse_arrays_cython_test(np.ndarray[Ctype_float, ndim=1] x,
             xp = yp
             yp = g
             
-            g = xp2
-            xp2 = yp2
-            yp2 = g
+        #    g = xp2
+        #    xp2 = yp2
+        #    yp2 = g
 
-        n0 = xp2-x[ii]
-        n1 = yp2-y[ii]
-        if n0 > 0 and n1 > 0 :
-            nn = float_max(n0, n1)
-            r0 = nn * sqrt((n0/nn)**2 + (n1/nn)**2)
-        else :
-            r0 = sqrt(n0**2 + n1**2)
-        n0 = xp-x[ii]
-        n1 = yp-y[ii]
-        if n0 > 0 and n1 > 0 :
-            nn = float_max(n0, n1)
-            r1 = nn * sqrt((n0/nn)**2 + (n1/nn)**2)
-        else :
-            r1 = sqrt(n0**2 + n1**2)
-        if r0 < r1 :
-            print('projecting straight down...', xp, yp, xp2, yp2)
-            xp = xp2
-            yp = yp2
+        #n0 = xp2-x[ii]
+        #n1 = yp2-y[ii]
+        #if n0 > 0 and n1 > 0 :
+        #    nn = float_max(n0, n1)
+        #    r0 = nn * sqrt((n0/nn)**2 + (n1/nn)**2)
+        #else :
+        #    r0 = sqrt(n0**2 + n1**2)
+        #n0 = xp-x[ii]
+        #n1 = yp-y[ii]
+        #if n0 > 0 and n1 > 0 :
+        #    nn = float_max(n0, n1)
+        #    r1 = nn * sqrt((n0/nn)**2 + (n1/nn)**2)
+        #else :
+        #    r1 = sqrt(n0**2 + n1**2)
+        #if r0 < r1 :
+        #    print('projecting straight down...', xp, yp, xp2, yp2)
+        #    xp = xp2
+        #    yp = yp2
 
         u[ii] = xp
         v[ii] = yp
