@@ -178,15 +178,9 @@ class Mapper_ellipse():
         
         # make the reconstruction modes
         #------------------------------
-        self.modes = np.zeros( (2 * self.sym_ops.no_solid_units,) + O.shape, O.dtype)
+        self.modes = np.zeros( (self.sym_ops.no_solid_units,) + O.shape, O.dtype)
         
-        # diffuse terms
-        #self.modes[:self.modes.shape[0]//2] = self.sym_ops.solid_syms_Fourier(Ohat, apply_translation = False, syms = self.modes[:self.modes.shape[0]//2])
-        self.modes[:self.modes.shape[0]//2] = self.sym_ops.solid_syms_Fourier(Ohat, apply_translation = False)
-        
-        # unit cell terms
-        #self.modes[self.modes.shape[0]//2:] = self.sym_ops.solid_syms_Fourier(Ohat, apply_translation = True, syms = self.modes[self.modes.shape[0]//2:])
-        self.modes[self.modes.shape[0]//2:] = self.sym_ops.solid_syms_Fourier(Ohat, apply_translation = True)
+        self.modes = self.sym_ops.solid_syms_Fourier(Ohat, apply_translation = True)
         
         self.iters = 0
 
@@ -195,10 +189,8 @@ class Mapper_ellipse():
         return out
     
     def Imap(self, modes):
-        U  = np.sum(modes[modes.shape[0]//2 :], axis=0)
-        D  = modes[: modes.shape[0]//2]
-        
-        I  = self.diffuse_weighting   * np.sum( (D * D.conj()).real, axis=0)
+        U  = np.sum(modes, axis=0)
+        I  = self.diffuse_weighting   * np.sum( (modes * modes.conj()).real, axis=0)
         I += self.unit_cell_weighting * (U * U.conj()).real
         return I
     
@@ -207,15 +199,11 @@ class Mapper_ellipse():
         #t0 = time.time()
         
         #out = np.empty_like(modes)
+        print('\nPsup: sum|modes|^2:', np.sum(np.abs(modes)**2))
         out = modes.copy()
         
-        # diffuse terms: unflip the modes
-        out[: modes.shape[0]//2] = \
-                self.sym_ops.unflip_modes_Fourier(out[: out.shape[0]//2], apply_translation = False, inplace=True)
-        
         # unit_cell terms: unflip the modes
-        out[modes.shape[0]//2 :] = \
-                self.sym_ops.unflip_modes_Fourier(out[out.shape[0]//2 :], apply_translation = True, inplace=True)
+        out = self.sym_ops.unflip_modes_Fourier(out, apply_translation = True, inplace=True)
         
         # average 
         out_solid = np.mean(out, axis=0)
@@ -224,13 +212,14 @@ class Mapper_ellipse():
 
         # propagate
         out_solid = np.fft.ifftn(out_solid)
-
+        
         # reality
-        out_solid.imag = 0
-
+        #out_solid.imag = 0
+        
         #t2 = time.time()
         # finite support
         if self.voxel_number :
+            print('\n\nVoxel number support')
             if self.overlap == 'unit_cell' :
                 self.voxel_support = choose_N_highest_pixels( (out_solid * out_solid.conj()).real.astype(np.float32), self.voxel_number, \
                                      support = self.support, mapper = self.sym_ops.solid_syms_real)
@@ -257,8 +246,7 @@ class Mapper_ellipse():
         
         #t5 = time.time()
         # broadcast
-        out[: out.shape[0]//2] = self.sym_ops.solid_syms_Fourier(out_solid, apply_translation=False, syms=out[: out.shape[0]//2])
-        out[out.shape[0]//2 :] = self.sym_ops.solid_syms_Fourier(out_solid, apply_translation=True,  syms=out[out.shape[0]//2 :])
+        out = self.sym_ops.solid_syms_Fourier(out_solid, apply_translation=True,  syms=out)
 
         self.iters += 1
         
@@ -272,105 +260,61 @@ class Mapper_ellipse():
         #print('imag copy time    :', t4-t3)
         #print('fftn time         :', t5-t4)
         #print('broadcast time    :', t6-t5)
+        print('Psup: sum|out|^2:', np.sum(np.abs(out)**2))
         return out
 
     def Pmod(self, modes):
-        #import time
-        #t0 = time.time()
-        U  = modes[modes.shape[0]//2 :]
-        D  = modes[: modes.shape[0]//2]
+        print('\nsum|modes|^2:', np.sum(np.abs(modes)**2))
+        u = np.fft.fftn(modes, axes=(0,)).reshape((modes.shape[0], -1)) / np.sqrt(modes.shape[0])
         
         # make x
         #-----------------------------------------------
-        x = np.sqrt(np.sum( (D * D.conj()).real, axis=0)).ravel()
+        x = np.sqrt((u[0] * u[0].conj()).real).ravel()
         
         # make y
         #-----------------------------------------------
-        # rotate the unit cell modes
-        # eg. for N = 2 : Ut = np.array([[1., 1.], [-1., 1.]], dtype=np.float64) / np.sqrt(2.)
-        # Ut = make_unitary_transform(modes.shape[0]//2)
-        # u = np.dot(Ut, U.reshape((U.shape[0], -1)))
+        if u.shape[0] > 1 :
+            y = np.sqrt(np.sum( (u[1:] * u[1:].conj()).real, axis=0))
+        else :
+            y = np.zeros_like(x)
         
-        # actually this is just an fft!
-        # just have to make sure that it is norm preserving
-        #u = (np.fft.fftn(U, axes=(0,))/np.sqrt(U.shape[0])).reshape((U.shape[0], -1))
-        #u = (np.fft.fftn(U, axes=(0,))/np.sqrt(U.shape[0]))[0].ravel()
-        u = (np.sum(U, axis=0)/np.sqrt(U.shape[0])).ravel()
+        print('\nsum|x2+y2|^2:', np.sum(x**2 + y**2))
+        print('\n  (x2+y2)[0]:', (x**2 + y**2)[0])
         
-        y = np.abs(u) # np.abs(np.sum(U, axis=0) / np.sqrt(U.shape[0]))
-        #print('\nchecking np.angle(U):', np.sum(np.angle(np.sum(U, axis=0)).ravel() \
-                #                                           - np.angle(u)))
-        
-        #print('y sum:', np.sum(y))
-        # look for forbidden reflections where e1_inf != 1
-        forbidden   = (y < 10000*self.alpha) 
-        
-        #t1 = time.time()
         # project onto xp yp
         #-----------------------------------------------
         xp, yp = project_2D_Ellipse_arrays_cython(x, y, 
                                                   self.diffuse_weighting.ravel(), self.unit_cell_weighting.ravel(), 
                                                   self.I.ravel(),
                                                   self.mask.ravel())
-        
-        #t2 = time.time()
-        #print('yp sum:', np.sum(yp))
         # xp yp --> modes
         #-----------------------------------------------
-        # d *= xp / x
-        #############
-        out = modes.copy()
-        out[: modes.shape[0]//2] *= (xp / (x + self.alpha)).reshape(D[0].shape)
+        #u[0]  = u[0]  * xp / (x + self.alpha)
+        angle = np.angle(u[0])
+        u[0]  = xp * np.exp(1J*angle)
         
-        #print('\nnp.sum(np.abs(xp[self.e1_inf==1])**2):', np.sum(np.abs(xp[self.e1_inf.ravel()==1])**2))
-        #print('\nnp.sum(np.abs(out[: modes.shape[0]//2])**2):', np.sum(np.abs(out[: modes.shape[0]//2])**2))
-        # u   *= yp / y
-        # U[0] = u
-        # U    = ifft(U)
-        ################
-        # for forbidden reflections be more careful 
-        angle         = np.angle(u[forbidden])
-        up            = np.empty_like(u)
-        up[forbidden] = yp[forbidden] * np.exp(1J * angle)
+        u[1:] = u[1:] * yp / (y + self.alpha)
+        print('sum (y < 1.0e-5)', np.sum(y<1.0e-5), yp[(y<1.0e-5)])
+        #for i in range(1, u[1:].shape[0], 1):
+        #    angle = np.angle(u[i])
+        #    u[i] = yp * np.angle(u[i])
+        y = np.sqrt(np.sum( (u[1:] * u[1:].conj()).real, axis=0))
+        print(np.allclose(y, yp))
         
-        # for everything else just scale (this is much faster)
-        up[~forbidden] = u[~forbidden] * yp[~forbidden] / y[~forbidden]
+        x = np.sqrt((u[0] * u[0].conj()).real).ravel()
+        print(np.allclose(x, xp))
+        print('\n  (x2+y2)[0]:', (x**2 + y**2)[0])
         
-        #print('\nnp.sum((yp*np.sqrt(M * self.unit_cell_weighting) - self.amp)**2):',np.sum((yp * np.sqrt(4. * self.unit_cell_weighting).ravel()- self.amp.ravel())**2))
-        #print('\nnp.sum((np.abs(up)*np.sqrt(self.unit_cell_weighting) - self.amp)**2):',np.sum((np.abs(up) * np.sqrt(4. * self.unit_cell_weighting).ravel()- self.amp.ravel())**2))
-        #print('\nnp.sum((self.e1 - self.amp)**2):',np.sum((self.e1 - self.amp)**2))
-        #print('\nnp.sum((np.abs(up)[self.e1_inf==1])**2):',np.sum((np.abs(up)[self.e1_inf.ravel()==1])**2))
-        
+        print('sum|u|^2    :', np.sum(np.abs(u)**2))
+         
         # un-rotate
-        #out[modes.shape[0]//2 :] = np.sqrt(U.shape[0])*np.fft.ifftn(u, axes=(0,)).reshape(D.shape)
-        out[modes.shape[0]//2 :] += (up - u).reshape(D[0].shape) / np.sqrt(U.shape[0])
-        #print('\nnp.sum((np.abs(Bmodes)*np.sqrt(self.unit_cell_weighting) - self.amp)**2):',np.sum((np.abs(np.sum(out[modes.shape[0]//2 :], axis=0)) * np.sqrt(self.unit_cell_weighting)- self.amp)**2))
+        u = np.fft.ifftn(u, axes=(0,)) * np.sqrt(modes.shape[0])
         
-        # check
-        #print('\nchecking np.abs(U):', np.sum(np.abs(np.sum(out[modes.shape[0]//2 :], axis=0)).ravel()  \
-                #                                      / np.sqrt(U.shape[0]) - np.abs(up)))
-        #print('\nchecking np.angle(U):', np.sum( (np.angle(up) - np.angle(u))[(np.abs(up)>1.0)*(np.abs(u)>1.0)] ))
-        #print('\nnp.angle(DU)[0]     :', np.angle(up)[0] - np.angle(u)[0])
-        #print('\nchecking np.angle(U):', np.sum((np.angle(np.sum(out[modes.shape[0]//2 :], axis=0)).ravel() \
-                #                                           - np.angle(u))[(np.abs(up)>1.0)*(np.abs(u)>1.0)]))
-        #print('\nchecking np.angle(U):', np.argmax((np.angle(np.sum(out[modes.shape[0]//2 :], axis=0)).ravel() \
-                #                                           - np.angle(u))*(np.abs(up)>1.0)*(np.abs(u)>1.0)))
-        # store the latest eMod, but just use one mode to speed this up
-        #delta     = modes[4] - out[4]
-        #self.eMod = self.l2norm(delta, out[4])
+        out = u.reshape(modes.shape)
         
-        #print('\n', self.eMod)
-        #print('\neMod:', eMod)
-        # check
-        #print(' sum | sqrt(I) - sqrt(Imap) | : ', self.Emod(out))
-        #print('Pmod -->  sum | modes - out | : ', np.sum( np.abs(modes - out) ))
-        #t3 = time.time()
-        #print('\nPmod:')
-        #print('total time  :', t3-t0)
-        #print('make xy time:', t1-t0)
-        #print('ellipse time:', t2-t1)
-        #print('apply mod time:', t3-t2)
-
+        #out = modes.copy()
+        print('\n Emod:',self.Emod(out))
+        print('sum|out|^2  :', np.sum(np.abs(out)**2))
         return out
 
     def Emod(self, modes):
@@ -378,14 +322,6 @@ class Mapper_ellipse():
         M         = self.mask * ( np.sqrt(M) - self.amp )**2
         eMod      = np.sum( M )
         eMod      = np.sqrt( eMod / self.I_norm )
-        
-        #if eMod < 1.0e-1 :
-        #    import h5py 
-        #    f = h5py.File('test')
-        #    f['amp'] = self.amp
-        #    f['amp_forward'] = np.sqrt(M)
-        #    f.close()
-        #    sys.exit()
         return eMod
 
     def Esup(self, modes):
@@ -415,122 +351,6 @@ class Mapper_ellipse():
             den += np.sum( (array0[i] * array0[i].conj()).real ) 
         return np.sqrt(num / den)
 
-    def scans_cheshire_old(self, solid, step=4):
-        """
-        scan the solid unit through the cheshire cell 
-        until the best agreement with the data is found.
-        """
-        
-        s = phasing_3d.utils.merge.centre(solid)
-        I, J, K = self.sym_ops.unitcell_size
-        I //= 2
-        J //= 2
-        K //= 2
-        modes = np.empty_like(self.modes)
-        errors = np.zeros((I, J, K), dtype=np.float)
-        errors.fill(np.inf)
-        for i in range(0, I, step):
-            for j in range(0, J, step):
-                for k in range(0, K, step):
-                    # shift
-                    s1 = phasing_3d.utils.merge.multiroll(s, [i,j,k])
-                    
-                    # propagate
-                    s1 = np.fft.fftn(s1)
-                    
-                    # broadcast
-                    modes[: modes.shape[0]//2] = self.sym_ops.solid_syms_Fourier(s1, apply_translation=False)
-                    modes[modes.shape[0]//2 :] = self.sym_ops.solid_syms_Fourier(s1, apply_translation=True)
-                    
-                    errors[i, j, k] = self.Emod(modes)
-                    print(i, j, k, errors[i,j,k])
-        
-        l = np.argmin(errors)
-        i, j, k = np.unravel_index(l, errors.shape)
-        print('lowest error at: i, j, k, err', i, j, k, errors[i,j,k])
-          
-        # shift
-        s1 = phasing_3d.utils.merge.multiroll(s, [i,j,k])
-        
-        # propagate
-        s1 = np.fft.fftn(s1)
-        
-        # broadcast
-        modes[: modes.shape[0]//2] = self.sym_ops.solid_syms_Fourier(s1, apply_translation=False)
-        modes[modes.shape[0]//2 :] = self.sym_ops.solid_syms_Fourier(s1, apply_translation=True)
-        
-        s1 = phasing_3d.utils.merge.multiroll(s, [i,j,k])
-        
-        info = {}
-        info['eMod'] = [errors[i, j, k]]
-        info['error_map'] = errors[0:I:step, 0:J:step, 0:K:step]
-        info['eCon'] = [self.l2norm(self.modes - modes, modes)]
-        info.update(self.finish(modes))
-        return s1, info
-
-    def scans_cheshire_newer_old(self, solid, steps=[4,4,4], unit_cell=False, err = 'Emod'):
-        """
-        scan the solid unit through the cheshire cell 
-        until the best agreement with the data is found.
-        """
-        if err == 'Emod' :
-            err = self.Emod 
-
-        I, J, K = self.sym_ops.unitcell_size
-        if unit_cell is False :
-            I //= 2
-            J //= 2
-            K //= 2
-        modes = np.empty_like(self.modes)
-        errors = np.zeros((I, J, K), dtype=np.float)
-        errors.fill(np.inf)
-        # propagate
-        s = np.fft.fftn(solid)
-        
-        ii = np.fft.fftfreq(s.shape[0]) 
-        jj = np.fft.fftfreq(s.shape[1])
-        kk = np.fft.fftfreq(s.shape[2])
-        for i in range(0, I, steps[0]):
-            T0 = np.exp(- 2J * np.pi * i * ii)
-            for j in range(0, J, steps[1]):
-                T1 = np.exp(- 2J * np.pi * j * jj)
-                for k in range(0, K, steps[2]):
-                    T2 = np.exp(- 2J * np.pi * k * kk)
-                     
-                    phase_ramp = reduce(np.multiply.outer, [T0, T1, T2])
-                    s1         = s * phase_ramp
-                     
-                    # broadcast
-                    modes[: modes.shape[0]//2] = self.sym_ops.solid_syms_Fourier(s1, apply_translation=False, syms = modes[: modes.shape[0]//2])
-                    modes[modes.shape[0]//2 :] = self.sym_ops.solid_syms_Fourier(s1, apply_translation=True, syms = modes[modes.shape[0]//2 :])
-                    
-                    errors[i, j, k] = err(modes)
-                    print(i, j, k, errors[i,j,k])
-        
-        l = np.argmin(errors)
-        i, j, k = np.unravel_index(l, errors.shape)
-        print('lowest error at: i, j, k, err', i, j, k, errors[i,j,k])
-          
-        # shift
-        T0 = np.exp(- 2J * np.pi * i * ii)
-        T1 = np.exp(- 2J * np.pi * j * jj)
-        T2 = np.exp(- 2J * np.pi * k * kk)
-        phase_ramp = reduce(np.multiply.outer, [T0, T1, T2])
-        s1         = s * phase_ramp
-        
-        # broadcast
-        modes[: modes.shape[0]//2] = self.sym_ops.solid_syms_Fourier(s1, apply_translation=False)
-        modes[modes.shape[0]//2 :] = self.sym_ops.solid_syms_Fourier(s1, apply_translation=True)
-        
-        s1 = np.fft.ifftn(s1)
-        
-        info = {}
-        info['eMod'] = [errors[i, j, k]]
-        info['error_map'] = errors[0:I:steps[0], 0:J:steps[1], 0:K:steps[2]]
-        info['eCon'] = [self.l2norm(self.modes - modes, modes)]
-        info.update(self.finish(modes))
-        return s1, info
-    
     def scans_cheshire(self, solid, steps=[1,1,1], unit_cell=False, err = 'Emod'):
         """
         scan the solid unit through the cheshire cell 
@@ -538,19 +358,17 @@ class Mapper_ellipse():
         """
         if err == 'Emod' :
             err = self.Emod 
-
+        
         I, J, K = self.sym_ops.unitcell_size
         if unit_cell is False :
-            I //= 2
-            J //= 2
-            K //= 2
+            I, J, K = self.sym_ops.Cheshire_cell
         
         errors = np.zeros((I, J, K), dtype=np.float)
         errors.fill(np.inf)
         
         # only evaluate the error on Bragg peaks that are strong 
         Bragg_mask = self.unit_cell_weighting > 1.0e-1 * self.unit_cell_weighting[0,0,0]
-
+        
         # symmetrise it so that we have all pairs in the point group
         Bragg_mask = self.sym_ops.solid_syms_Fourier(Bragg_mask, apply_translation=False)
         Bragg_mask = np.sum(Bragg_mask, axis=0)>0
@@ -594,14 +412,12 @@ class Mapper_ellipse():
                     s1[Bragg_mask] = sBragg * phase_ramp
                      
                     # broadcast
-                    modes[: modes.shape[0]//2] = self.sym_ops.solid_syms_Fourier_masked(s1, ii, jj, kk, apply_translation=False, syms = modes[: modes.shape[0]//2])
-                    modes[modes.shape[0]//2 :] = self.sym_ops.solid_syms_Fourier_masked(s1, ii, jj, kk, apply_translation=True,  syms = modes[modes.shape[0]//2 :])
+                    modes = self.sym_ops.solid_syms_Fourier_masked(s1, ii, jj, kk, apply_translation=True,  syms = modes)
                     
                     # I map
-                    U  = np.sum(modes[modes.shape[0]//2 :], axis=0)
-                    D  = modes[: modes.shape[0]//2]
+                    U  = np.sum(modes, axis=0)
                      
-                    I  = diffuse_weighting   * np.sum( (D * D.conj()).real, axis=0)
+                    I  = diffuse_weighting   * np.sum( (modes * modes.conj()).real, axis=0)
                     I += unit_cell_weighting * (U * U.conj()).real
                     
                     # Emod
@@ -626,9 +442,7 @@ class Mapper_ellipse():
         s1         = s * phase_ramp
         
         # broadcast
-        modes  = np.empty(self.modes.shape, dtype=self.modes.dtype)
-        modes[: modes.shape[0]//2] = self.sym_ops.solid_syms_Fourier(s1, apply_translation=False)
-        modes[modes.shape[0]//2 :] = self.sym_ops.solid_syms_Fourier(s1, apply_translation=True)
+        modes = self.sym_ops.solid_syms_Fourier(s1, apply_translation=True)
         
         s1 = np.fft.ifftn(s1)
         
@@ -638,22 +452,6 @@ class Mapper_ellipse():
         info['eCon'] = [self.l2norm(self.modes - modes, modes)]
         info.update(self.finish(modes))
         return s1, info
-
-def make_unitary_transform(N):
-    U = np.zeros((N, N), dtype=np.float)
-    U[0, :] = 1  / np.sqrt(N)
-    U[1:, 0] = -1 / np.sqrt(N)
-    for n in range(1, N):
-        for m in range(1, N):
-            if n == m :
-                U[n, m] = (N * (N - 2) + np.sqrt(N)) / ( (N - 1)*N )
-            else :
-                U[n, m] = (-N + np.sqrt(N)) / ( (N - 1)*N )
-
-    # check:
-    # assert np.allclose(np.dot(U.T, U), np.identity(N))
-    return U
-
 
 def choose_N_highest_pixels(array, N, tol = 1.0e-10, maxIters=1000, mapper = None, support = None):
     """

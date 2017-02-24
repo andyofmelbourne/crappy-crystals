@@ -69,6 +69,7 @@ def phase(mapper, iters_str = '100DM 100ERA', beta=1):
     """
     alg_iters = config_iters_to_alg_num(iters_str)
     
+    Cheshire_error_map = None
     eMod = []
     eCon = []
     O = mapper.O
@@ -84,9 +85,13 @@ def phase(mapper, iters_str = '100DM 100ERA', beta=1):
         
         if alg == 'cheshire':
            O, info = mapper.scans_cheshire(O, steps=[1,1,1])
+           Cheshire_error_map = info['error_map'].copy()
          
         eMod += info['eMod']
         eCon += info['eCon']
+
+    if Cheshire_error_map is not None :
+        info['Cheshire_error_map'] = Cheshire_error_map
     
     return O, mapper, eMod, eCon, info
 
@@ -188,6 +193,7 @@ if __name__ == '__main__':
     if not os.path.exists(outputdir):
         os.makedirs(outputdir)
     
+    print('writing to:', args.filename)
     f = h5py.File(args.filename)
     
     group = '/phase'

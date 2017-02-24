@@ -41,6 +41,8 @@ def add_noise_3d(diff, n, is_fft_shifted = True, remove_courners = True, unit_ce
         diff_out = np.fft.ifftshift(diff.copy())
     else :
         diff_out = diff.copy()
+
+    print('diff[0,0,0]:', diff[0,0,0])
     
     norm = np.sum(diff)
     
@@ -94,6 +96,7 @@ def add_noise_3d(diff, n, is_fft_shifted = True, remove_courners = True, unit_ce
         diff_out[l] = 0.0
         mask[l]     = False
 
+    print('diff_out[0,0,0]:', diff_out[0,0,0])
     return diff_out, mask
 
 def rad_av(diff, rs = None, is_fft_shifted = True):

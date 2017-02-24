@@ -405,7 +405,7 @@ def project_2D_Ellipse_arrays_cython(np.ndarray[Ctype_float, ndim=1] x,
             Ip = Wyi*xp**2 + Wxi*yp**2
         
         if Ip != Ii :
-            #print('Ip != 1', Ip)
+            #print('Ip != Ii', Ip, Ii)
             Ip = sqrt(Ii) / sqrt(Ip)
             xp *= Ip 
             yp *= Ip

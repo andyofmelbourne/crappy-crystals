@@ -563,7 +563,7 @@ class Forward_model_widget(QtGui.QWidget):
             # real-space crystal view 
             #########################
             #cryst = self.f['/forward_model/solid_unit'][()].real
-            cryst = self.f[self.crystal_path][()].real
+            cryst = np.abs(self.f[self.crystal_path][()])
             #cryst = np.fft.fftshift(cryst)
             # add 10 pix padding
             padd = np.zeros((10, cryst.shape[0]), dtype=cryst.real.dtype)
@@ -695,7 +695,7 @@ class Phase_widget(QtGui.QWidget):
             # real-space crystal view 
             #########################
             #cryst = self.f['/forward_model/solid_unit'][()].real
-            cryst = self.f[self.crystal_path][()].real
+            cryst = np.abs(self.f[self.crystal_path][()])
             #cryst = np.fft.fftshift(cryst)
             # add 10 pix padding
             padd = np.zeros((10, cryst.shape[0]), dtype=cryst.real.dtype)
@@ -806,15 +806,15 @@ class Run_and_log_command(QtGui.QWidget):
             
             # emmit a signal when complete
             self.finished_signal.emit(True)
-            print('Output   :', self.output)
+            print('Output   :', self.output.decode("utf-8"))
             
         else :
             self.status_label.setText(str(status))
             
             # get the output and error msg
             self.output, self.err_msg = self.p.communicate()
-            print('Output   :', self.output)
-            print('Error msg:', self.err_msg)
+            print('Output   :', self.output.decode("utf-8"))
+            print('Error msg:', self.err_msg.decode("utf-8"))
             
             # emmit a signal when complete
             self.finished_signal.emit(False)
