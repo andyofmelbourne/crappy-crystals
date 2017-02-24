@@ -242,6 +242,7 @@ class Mapper_ellipse():
         self.e1_inf[i] = False
         print(np.sum(i), 'normal / noisey, no diffuse, on Bragg, non-masked pixels')
 
+        """
         # test: try masking pixels for which D>0 or B>0 and I==0 
         i = (~D0 + ~B0)*(I0)*m
         self.e0[i] = np.inf
@@ -252,6 +253,13 @@ class Mapper_ellipse():
         self.mask[i]   = False
         print(np.sum(i), 'masked I==0 pixels')
         print(np.sum(self.mask), 'masked pixels so far')
+        """
+
+        i = (~D0 + ~B0)*(I0)*m
+        self.e0[i] = np.sqrt(I[i]) / np.sqrt(self.diffuse_weighting[i] + M*self.unit_cell_weighting[i])
+        self.e1[i] = np.sqrt(I[i]) / np.sqrt(self.diffuse_weighting[i])
+        self.e0_inf[i] = False
+        self.e1_inf[i] = False
 
         # 'masked' D>=0, B>=0, I>=0, m = 0
         if m is not 1 and m is not True :
@@ -398,6 +406,7 @@ class Mapper_ellipse():
                                                   x, y, 
                                                   self.e0_inf.ravel(), self.e1_inf.ravel(), 
                                                   self.I0.ravel())
+        #xp, yp = x.copy(), y.copy()
         
         # xp yp --> modes
         #-----------------------------------------------
@@ -422,6 +431,7 @@ class Mapper_ellipse():
         
         out = u.reshape(modes.shape)
         
+        #out = modes.copy()
         print('\n Emod:',self.Emod(out))
         print('sum|out|^2  :', np.sum(np.abs(out)**2))
         return out
