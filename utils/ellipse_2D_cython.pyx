@@ -304,10 +304,14 @@ def project_2D_Ellipse_arrays_cython(np.ndarray[Ctype_float, ndim=1] e0,
         if yp < 0 :
             y_inv = 1
             yp = -yp
+        else :
+            y_inv = 0
             
         if xp < 0 :
             x_inv = 1
             xp = -xp        
+        else :
+            y_inv = 0
             
         # change variables
         # ----------------

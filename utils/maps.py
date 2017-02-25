@@ -192,7 +192,7 @@ class Mapper_ellipse():
         # e_0/1 -> inf
         #-----------------------------------------------
         
-        tol = 1.0e-13
+        tol = 1.0e-10
         
         self.e0     = np.zeros_like(self.diffuse_weighting)
         self.e0_inf = np.zeros(self.diffuse_weighting.shape, dtype = np.bool)
@@ -254,12 +254,22 @@ class Mapper_ellipse():
         print(np.sum(i), 'masked I==0 pixels')
         print(np.sum(self.mask), 'masked pixels so far')
         """
-
-        i = (~D0 + ~B0)*(I0)*m
+        i = (~D0)*(B0)*(I0)*m
         self.e0[i] = np.sqrt(I[i]) / np.sqrt(self.diffuse_weighting[i] + M*self.unit_cell_weighting[i])
-        self.e1[i] = np.sqrt(I[i]) / np.sqrt(self.diffuse_weighting[i])
+        self.e1[i] = np.inf
         self.e0_inf[i] = False
+        self.e1_inf[i] = True
+
+        i = (D0)*(~B0)*(I0)*m
+        self.e0[i] = np.inf
+        self.e1[i] = np.sqrt(I[i]) / np.sqrt(self.diffuse_weighting[i])
+        self.e0_inf[i] = True
         self.e1_inf[i] = False
+        #i = (~D0 + ~B0)*(I0)*m
+        #self.e0[i] = np.sqrt(I[i]) / np.sqrt(self.diffuse_weighting[i] + M*self.unit_cell_weighting[i])
+        #self.e1[i] = np.sqrt(I[i]) / np.sqrt(self.diffuse_weighting[i])
+        #self.e0_inf[i] = False
+        #self.e1_inf[i] = False
 
         # 'masked' D>=0, B>=0, I>=0, m = 0
         if m is not 1 and m is not True :
@@ -398,6 +408,8 @@ class Mapper_ellipse():
             y = np.zeros_like(x)
         
         print('\nsum|x2+y2|^2:', np.sum(x**2 + y**2))
+        print('\nsum|x2|^2   :', np.sum(x**2))
+        print('\nsum|y2|^2   :', np.sum(y**2))
         print('\n  (x2+y2)[0]:', (x**2 + y**2)[0])
         
         # project onto xp yp
@@ -407,6 +419,26 @@ class Mapper_ellipse():
                                                   self.e0_inf.ravel(), self.e1_inf.ravel(), 
                                                   self.I0.ravel())
         #xp, yp = x.copy(), y.copy()
+        print('np.sum(~np.isfinite(xp)):', np.sum(~np.isfinite(xp)))
+        print('np.sum(~np.isfinite(yp)):', np.sum(~np.isfinite(yp)))
+        
+        print('diffuse_weighting')
+        print(self.diffuse_weighting.ravel()[~np.isfinite(yp)])
+        print('unit_cell_weighting')
+        print(self.unit_cell_weighting.ravel()[~np.isfinite(yp)])
+        print('I0')
+        print(self.I0.ravel()[~np.isfinite(yp)])
+        print('e0')
+        print(self.e0.ravel()[~np.isfinite(yp)])
+        print('e1')
+        print(self.e1.ravel()[~np.isfinite(yp)])
+        print('e0_inf')
+        print(self.e0_inf.ravel()[~np.isfinite(yp)])
+        print('e1_inf')
+        print(self.e1_inf.ravel()[~np.isfinite(yp)])
+        print('sum|yp2|^2:', np.sum(yp**2))
+        print('sum|xp2|^2:', np.sum(xp**2))
+        print('sum|yp2|^2:', np.sum(yp**2))
         
         # xp yp --> modes
         #-----------------------------------------------
