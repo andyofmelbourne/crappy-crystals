@@ -314,6 +314,166 @@ class P212121():
         else :
             return C
 
+class Ptest():
+    """
+    Store arrays to make the crystal mapping more
+    efficient.
+
+    Assume that Fourier space arrays are fft shifted.
+
+    Perform symmetry operations with the np.fft.fftfreq basis
+    so that (say) a flip operation behaves like:
+    a         = [0, 1, 2, 3, 4, 5, 6, 7]
+    a flipped = [0, 7, 6, 5, 4, 3, 2, 1]
+
+    or:
+    i         = np.fft.fftfreq(8)*8
+              = [ 0,  1,  2,  3, -4, -3, -2, -1]
+    i flipped = [ 0, -1, -2, -3, -4,  3,  2,  1]
+    """
+    def __init__(self, unitcell_size, det_shape, dtype=np.complex128):
+        # only calculate the translations when they are needed
+        self.translations      = None
+        self.translations_conj = None
+        self.no_solid_units = 4
+        
+        self.unitcell_size = unitcell_size
+        self.Cheshire_cell = (unitcell_size[0]//2, unitcell_size[1]//2,unitcell_size[2]//2)
+        self.det_shape     = det_shape
+        
+        # keep an array for the 4 symmetry related coppies of the solid unit
+        #self.syms = np.zeros((4,) + tuple(det_shape), dtype=dtype)
+
+    def make_Ts(self):
+        """
+        For infinite crystals we are free to add +- a,b or c to 
+        each of the translations. For finite crystals this choise 
+        depends on the crystal model
+        """
+        det_shape     = self.det_shape
+        unitcell_size = self.unitcell_size
+        # store the tranlation ramps
+        # x = x
+        T0 = np.ones(det_shape, dtype=np.complex128)
+        # x = 0.5 + x, 0.5 - y, -z
+        T1 = T_fourier(det_shape, [-unitcell_size[0]/2., unitcell_size[1]/2., 0.0])
+        # x = -x, 0.5 + y, 0.5 - z
+        T2 = T_fourier(det_shape, [0.0, -unitcell_size[1]/2., unitcell_size[2]/2.])
+        # x = 0.5 - x, -y, 0.5 + z
+        T3 = T_fourier(det_shape, [unitcell_size[0]/2., 0.0, -unitcell_size[2]/2.])
+        self.translations      = np.array([T0, T1, T2, T3])
+        self.translations_conj = self.translations.conj()
+    
+    def solid_syms_Fourier(self, solid, apply_translation = True, syms = None):
+        if syms is None :
+            syms = np.empty((4,) + solid.shape, dtype=solid.dtype) # syms 
+
+        syms[:] = solid
+        
+        if apply_translation :
+            if self.translations is None :
+                self.make_Ts()
+            
+            syms *= self.translations
+        return syms
+
+    def solid_syms_Fourier_masked(self, solid, i, j, k, apply_translation = True, syms = None):
+        """
+        solid = full solid unit at the detector
+        syms  = masked syms  
+        """
+        if syms is None :
+            syms = np.empty((4,) + i.shape, dtype=solid.dtype) # syms 
+        
+        # x = x
+        syms[:] = solid[(i,j,k)]
+        
+        if apply_translation :
+            if self.translations is None :
+                self.make_Ts()
+            
+            for ii in range(4):
+                syms[ii] *= self.translations[ii][(i,j,k)]
+        
+        return syms
+
+    def unflip_modes_Fourier(self, U, apply_translation=True, inplace = False):
+        if inplace :
+            U_inv = U
+        else :
+            U_inv = U.copy()
+        
+        if apply_translation :
+            if self.translations is None :
+                self.make_Ts()
+            
+            U_inv *= self.translations_conj
+        
+        return U_inv
+
+    def solid_syms_real(self, solid, syms=None):
+        """
+        This uses pixel shifts (not phase ramps) for translation.
+        Therefore sub-pixel shifts are ignored.
+        """
+        if syms is None :
+            syms = np.empty((4,) + solid.shape, dtype=solid.dtype) # self.syms 
+        
+        # x = x
+        syms[:] = solid
+        
+        translations = []
+        translations.append([-self.unitcell_size[0]//2, self.unitcell_size[1]//2, 0])
+        translations.append([0, -self.unitcell_size[1]//2, self.unitcell_size[2]//2])
+        translations.append([self.unitcell_size[0]//2, 0, -self.unitcell_size[2]//2])
+        
+        for i, t in enumerate(translations):
+            syms[i+1] = multiroll(syms[i+1], t)
+        return syms
+
+    def solid_to_crystal_real(self, solid, return_unit=False):
+        """
+        Generate the symmetry related copies of the real-space solid unit
+        in the crystal. This includes all symmetry related coppies of the 
+        solid unit that fit within the field-of-view (not just the unit-cell
+        as in solid_syms_real).
+        """
+        # calculate the number of times that we need to tile the unit-cell 
+        # unit so that we fill the field-of-view
+        tiles = np.ceil(2*np.array(solid.shape, dtype=np.float) / np.array(self.unitcell_size, dtype=np.float) - 1.0).astype(np.int)
+        
+        # get the symmetry related coppies of solid in the unit-cell
+        # hopefully these fit in the field-of-view...
+        U = np.sum(self.solid_syms_real(solid), axis=0)
+        
+        # un-fftshift them
+        U = np.fft.fftshift(U)
+        
+        # now translate the unit-cell by tiles in each dimension
+        C = U.copy()
+
+        # temp array to speed up multiroll_nowrap
+        t = np.asarray(np.zeros_like(U))
+        
+        for i in (np.arange(tiles[0]) - tiles[0]//2):
+            for j in (np.arange(tiles[1]) - tiles[1]//2):
+                for k in (np.arange(tiles[2]) - tiles[2]//2):
+                    if i == 0 and j == 0 and k == 0 :
+                        continue
+                    
+                    shift = np.array([i, j, k]) * np.array(self.unitcell_size)
+                    
+                    #print(i,j,k, shift, U.shape)
+                    #print(i,j,k, shift, index)
+                    C += multiroll_nowrap(U, shift, y = t)
+        
+        # re-fftshift them
+        C = np.fft.ifftshift(C)
+        
+        if return_unit :
+            return C, np.fft.ifftshift(U)
+        else :
+            return C
 
 def test_P212121():
     # make a unit cell

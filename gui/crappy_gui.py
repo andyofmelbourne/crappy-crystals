@@ -71,6 +71,11 @@ class Gui(QtGui.QTabWidget):
         self.tabs.append( widgets.Phase_widget(filename) )
         self.addTab(self.tabs[-1], "Phase")
 
+        # Show Ellipse tab
+        ########################
+        self.tabs.append( widgets.Ellipse_projections_widget(filename) )
+        self.addTab(self.tabs[-1], "Ellipse projections")
+
 def gui(filename):
     signal.signal(signal.SIGINT, signal.SIG_DFL) # allow Control-C
     app = QtGui.QApplication([])

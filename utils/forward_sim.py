@@ -157,6 +157,9 @@ def generate_diff(solid_unit, unit_cell, N, sigma, **params):
     elif space_group == 'P212121':
         sym_ops = symmetry_operations.P212121(unit_cell, solid_unit.shape)
     
+    elif space_group == 'Ptest':
+        sym_ops = symmetry_operations.Ptest(unit_cell, solid_unit.shape)
+    
     # define the solid_unit support
     ###############################
     if io_utils.isValid('support_frac', params):

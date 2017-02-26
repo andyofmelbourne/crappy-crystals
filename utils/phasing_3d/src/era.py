@@ -130,7 +130,7 @@ def ERA(iters, **args):
     info['eMod']  = eMods
     info['eCon']  = eCons
     
-    info.update(mapper.finish(mapper.Pmod(modes)))
+    info.update(mapper.finish(mapper.Psup(modes)))
     
     O = mapper.O
     return O, info

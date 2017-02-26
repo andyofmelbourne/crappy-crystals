@@ -212,6 +212,8 @@ if __name__ == '__main__':
         del f[key]
     f[key] = mapper.sym_ops.solid_to_crystal_real(O)
 
+    # testing
+    ###################################
     # e0
     key = group+'/e0'
     if key in f :
@@ -242,11 +244,42 @@ if __name__ == '__main__':
     #    del f[key]
     #f[key] = mapper.M
 
+    # x
+    key = group+'/x'
+    if key in f :
+        del f[key]
+    f[key] = mapper.x
+    
+    # y
+    key = group+'/y'
+    if key in f :
+        del f[key]
+    f[key] = mapper.y
+    
+    # xp
+    key = group+'/xp'
+    if key in f :
+        del f[key]
+    f[key] = mapper.xp
+    
     # yp
-    #key = group+'/yp'
-    #if key in f :
-    #    del f[key]
-    #f[key] = (mapper.yp - mapper.amp)
+    key = group+'/yp'
+    if key in f :
+        del f[key]
+    f[key] = mapper.yp
+
+    # S
+    key = group+'/S'
+    if key in f :
+        del f[key]
+    f[key] = mapper.S
+    
+    # Sp
+    key = group+'/Sp'
+    if key in f :
+        del f[key]
+    f[key] = mapper.Sp
+    ###################################
 
     # I0
     key = group+'/I0'
