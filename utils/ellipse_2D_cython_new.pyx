@@ -345,7 +345,7 @@ def project_2D_Ellipse_arrays_cython_test(np.ndarray[Ctype_float, ndim=1] x,
                 z0 = n0 / n1
                 xp = ep0 * z0
                 yp = ep1 * sqrt(1. - z0*z0)
-                print('projecting from the x-axis')
+                #print('projecting from the x-axis')
             else :
                 xp = ep0
                 yp = 0.
@@ -417,7 +417,7 @@ def project_2D_Ellipse_arrays_cython_test(np.ndarray[Ctype_float, ndim=1] x,
             Ip = Wyi*xp**2 + Wxi*yp**2
         
         if abs(Ip - Ii) > tol :
-            print('Ip != 1', Ii, Ip)
+            #print('Ip != 1', Ii, Ip)
             Ip = sqrt(Ii) / sqrt(Ip)
             xp *= Ip 
             yp *= Ip

@@ -820,19 +820,35 @@ class Ellipse_projections_widget(QtGui.QWidget):
             xp = g['xp'][0]
             yp = g['yp'][0]
             
-            if Wx > 0. :
+            tol = 1.0e-8
+            if Wx > tol and Wy > tol :
                 N  = 10000
                 xs = np.linspace(-(1.-1./N)*np.sqrt(I)/np.sqrt(Wx), np.sqrt(I)/np.sqrt(Wx), 10000, endpoint=False)
-            
-            if Wy > 0. :
-                y1s =  np.array([0] + list(np.sqrt(I - Wx * xs**2)/np.sqrt(Wy)) + [0])
-                y2s = -np.array([0] + list(np.sqrt(I - Wx * xs**2)/np.sqrt(Wy)) + [0])
+                
+                y1s = np.sqrt(I - Wx * xs**2)/np.sqrt(Wy)
+                y1s = np.array([0] + list(y1s) + [0])
+                y2s = -y1s
                 
                 xs = [-np.sqrt(I)/np.sqrt(Wx)] + list(xs) + [np.sqrt(I)/np.sqrt(Wx)]
                 xs = np.array(xs)
-
-            self.plot.plot(xs, y1s, pen=pg.mkPen('b'))
-            self.plot.plot(xs, y2s, pen=pg.mkPen('b'))
+                
+                self.plot.plot(xs, y1s, pen=pg.mkPen('b'))
+                self.plot.plot(xs, y2s, pen=pg.mkPen('b'))
+                
+            elif Wx > tol and Wy < tol :
+                xs = [-np.sqrt(I)/np.sqrt(Wx), np.sqrt(I)/np.sqrt(Wx)]
+                ys = [-3*xs[0], 3*xs[0]]
+                self.plot.plot([xs[0], xs[0]], ys, pen=pg.mkPen('b'))
+                self.plot.plot([xs[1], xs[1]], ys, pen=pg.mkPen('b'))
+            
+            elif Wx < tol and Wy > tol :
+                ys = [-np.sqrt(I)/np.sqrt(Wy), np.sqrt(I)/np.sqrt(Wy)]
+                xs = [-3*ys[0], 3*ys[0]]
+                self.plot.plot(xs, [ys[0], ys[0]], pen=pg.mkPen('b'))
+                self.plot.plot(xs, [ys[1], ys[1]], pen=pg.mkPen('b'))
+            
+            else :
+                self.plot.plot([0,0], [0,0], pen=pg.mkPen('b'))
 
             # plot the projected line
             self.plot.plot([x, xp], [y, yp], pen=pg.mkPen('y'))

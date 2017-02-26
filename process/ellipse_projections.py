@@ -89,6 +89,10 @@ if __name__ == '__main__':
     if params['random_xy'] is not None and params['random_xy'] is not False :
         if Wx > 0 and Wy > 0 and I > 0 :
             r = max(np.sqrt(I)/np.sqrt(Wx), np.sqrt(I)/np.sqrt(Wy))
+        elif Wx > 0 :
+            r = max(np.sqrt(I)/np.sqrt(Wx))
+        elif Wy > 0 :
+            r = max(np.sqrt(I)/np.sqrt(Wy))
         else :
             r = 1.
 

@@ -146,7 +146,8 @@ class Mapper_ellipse():
             self.alpha = args['alpha']
 
         # test
-        #I = np.random.random(I.shape)
+        #I = -0.1 + np.random.random(I.shape)
+        #I[I<0] = 0
         
         self.I_norm = (self.mask * I).sum()
         self.amp    = np.sqrt(I.astype(dtype))
@@ -180,12 +181,18 @@ class Mapper_ellipse():
         
         # diffuse and Bragg weightings
         #-----------------------------
-        self.unit_cell_weighting = self.mask * args['Bragg_weighting']
-        self.diffuse_weighting   = self.mask * args['diffuse_weighting']
+        if isValid('Bragg_weighting', args):
+            self.unit_cell_weighting = self.mask * args['Bragg_weighting']
+        else :
+            self.unit_cell_weighting = np.zeros_like(I)
+        if isValid('diffuse_weighting', args):
+            self.diffuse_weighting   = self.mask * args['diffuse_weighting']
+        else :
+            self.diffuse_weighting   = np.zeros_like(I)
         
         # test
-        #self.unit_cell_weighting = np.random.random(I.shape)
-        #self.diffuse_weighting   = np.random.random(I.shape)
+        #self.unit_cell_weighting = np.random.random(I.shape)*1000
+        #self.diffuse_weighting   = np.random.random(I.shape)*1.0e-5
         
         # make the reconstruction modes
         #------------------------------
@@ -319,7 +326,7 @@ class Mapper_ellipse():
         """
 
         # mask pixels where I == 0 
-        #self.mask[I==0] = False
+        self.mask[I==0] = False
 
         self.e0_inf = self.e0_inf.astype(np.uint8)
         self.e1_inf = self.e1_inf.astype(np.uint8)

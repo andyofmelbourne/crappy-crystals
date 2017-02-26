@@ -164,12 +164,22 @@ if __name__ == '__main__':
         support = None
     else :
         support = f[params['support']][()]
+        
+    if params['bragg_weighting'] is None or params['bragg_weighting'] is False :
+        bragg_weighting = None
+    else :
+        bragg_weighting = f[params['bragg_weighting']][()]
+
+    if params['diffuse_weighting'] is None or params['diffuse_weighting'] is False :
+        diffuse_weighting = None
+    else :
+        diffuse_weighting = f[params['diffuse_weighting']][()]
 
     # make the mapper
     #################
     mapper = maps.Mapper_ellipse(f[params['data']][()], 
-                                 Bragg_weighting   = f[params['bragg_weighting']][()], 
-                                 diffuse_weighting = f[params['diffuse_weighting']][()], 
+                                 Bragg_weighting   = bragg_weighting, 
+                                 diffuse_weighting = diffuse_weighting, 
                                  solid_unit        = solid_unit,
                                  voxels            = voxels,
                                  overlap           = params['overlap'],
