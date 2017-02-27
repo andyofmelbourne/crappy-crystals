@@ -182,14 +182,16 @@ class Mapper_ellipse():
         # diffuse and Bragg weightings
         #-----------------------------
         if isValid('Bragg_weighting', args):
-            self.unit_cell_weighting = self.mask * args['Bragg_weighting']
+            self.unit_cell_weighting = args['Bragg_weighting']
         else :
             self.unit_cell_weighting = np.zeros_like(I)
+        
         if isValid('diffuse_weighting', args):
-            self.diffuse_weighting   = self.mask * args['diffuse_weighting']
+            self.diffuse_weighting   = args['diffuse_weighting']
         else :
             self.diffuse_weighting   = np.zeros_like(I)
         
+        self.mask[self.unit_cell_weighting==0] = False
         # test
         #self.unit_cell_weighting = np.random.random(I.shape)*1000
         #self.diffuse_weighting   = np.random.random(I.shape)*1.0e-5
@@ -326,7 +328,10 @@ class Mapper_ellipse():
         """
 
         # mask pixels where I == 0 
-        self.mask[I==0] = False
+        #self.mask[I==0] = False
+        tol = 1.0e-9
+        self.mask[(self.diffuse_weighting < tol) * (self.unit_cell_weighting < tol)] = False
+        self.I_norm = (self.mask * I).sum()
 
         self.e0_inf = self.e0_inf.astype(np.uint8)
         self.e1_inf = self.e1_inf.astype(np.uint8)
@@ -519,9 +524,10 @@ class Mapper_ellipse():
         #-----------------------------------------------
         Wx = self.diffuse_weighting + self.sym_ops.no_solid_units * self.unit_cell_weighting
         Wy = self.diffuse_weighting 
+        print('\n   Wy==0? :', np.allclose(Wy, 0.))
         print('\nsqrt( sum (Wx x**2 + Wy y**2 - I)**2 )', 
-                np.sqrt(np.sum((Wx.ravel()*x**2 + Wy.ravel()*y**2 - self.I.ravel())**2)) \
-                / np.sqrt(np.sum(self.I**2)))
+                np.sqrt(np.sum(self.mask.ravel()*(Wx.ravel()*x**2 + Wy.ravel()*y**2 - self.I.ravel())**2)) \
+                / np.sqrt(np.sum(self.mask*self.I**2)))
 
         # save x and y for giggles
         self.S = np.abs(modes[0])
@@ -532,9 +538,15 @@ class Mapper_ellipse():
                                           self.I.ravel(),
                                           self.mask.astype(np.uint8).ravel())
         self.xp, self.yp = xp.reshape(modes[0].shape), yp.reshape(modes[0].shape)
-        print('\nsqrt( sum (Wx xp**2 + Wy yp**2 - I)**2 )', 
-                np.sqrt(np.sum((Wx.ravel()*xp**2 + Wy.ravel()*yp**2 - self.I.ravel())**2)) \
-                / np.sqrt(np.sum(self.I**2)))
+        diff = self.mask.ravel()*(Wx.ravel()*xp**2 + Wy.ravel()*yp**2 - self.I.ravel())**2 
+                
+        print('\nsqrt( sum (Wx xp**2 + Wy yp**2 - I)**2 )', np.sqrt(np.sum(diff))/ np.sqrt(np.sum(self.mask*self.I**2)))
+        i = np.argmax(diff)
+        ii = np.unravel_index(i, self.I.shape)
+        print('worst value at:', ii, 'Wx:', Wx[ii], 'Wy:', Wy[ii], 'err:', diff[i])
+        print('x :', x[i],  'y:', yp[i])
+        print('xp:', xp[i], 'yp:', yp[i])
+        print('I:', self.I[ii], 'forward I:', Wx[ii] * xp[i]**2 + Wy[ii] * yp[i]**2)
         
         # xp yp --> modes
         #-----------------------------------------------
@@ -542,7 +554,9 @@ class Mapper_ellipse():
         angle = np.angle(u[0])
         u[0]  = xp * np.exp(1J*angle)
         
+        temp = u[1:].copy()
         u[1:] = u[1:] * yp / (y + self.alpha)
+        print('sum((u[1:]0-u[1:])**2):', np.sum((u[1:]-temp)**2))
         i = np.argmin(yp/(y+self.alpha))
         j = np.argmax(yp/(y+self.alpha))
         print('yp/y min, max:', (yp/(y+self.alpha)).min(), (yp/(y+self.alpha)).max())

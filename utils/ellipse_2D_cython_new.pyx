@@ -278,6 +278,8 @@ def project_2D_Ellipse_arrays_cython_test(np.ndarray[Ctype_float, ndim=1] x,
                 u[ii] = -sqrt(Ii)/sqrt(Wxi)
             else :
                 u[ii] =  sqrt(Ii)/sqrt(Wxi)
+            if abs(Wxi * u[ii]**2 - Ii) > tol*Ii:
+                print('scale:',1./sqrt(Wxi), 'forward I:', Wxi * u[ii]**2, 'I:', Ii)
             continue
 
         elif abs(x[ii]) < tol and (Wxi < Wyi):
@@ -295,6 +297,7 @@ def project_2D_Ellipse_arrays_cython_test(np.ndarray[Ctype_float, ndim=1] x,
             else :
                 u[ii] =  sqrt(Ii)/sqrt(Wxi)
             continue
+        
                  
         # transpose axes so that e0 > e1 
         # ------------------------------
