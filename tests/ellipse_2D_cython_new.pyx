@@ -240,22 +240,19 @@ def project_2D_Ellipse_arrays_cython_test(np.ndarray[Ctype_float, ndim=1] x,
     cdef double e1_sq, e0_sq, one_on_ep1, one_on_ep0, ep0, ep1, tol, z0, z1, Ip, xp, yp, nn
     cdef np.ndarray[Ctype_float, ndim = 1] u = np.empty((ii_max), dtype=np.float)
     cdef np.ndarray[Ctype_float, ndim = 1] v = np.empty((ii_max), dtype=np.float)
-
-    tol = 1.0e-10
     
     for ii in range(ii_max):
         Ii, Wxi, Wyi = I[ii], Wx[ii], Wy[ii]
-        
-        if mask[ii] == 0 or (abs(Wxi) < tol and abs(Wyi) < tol):
+        if mask[ii] == 0 or (Wxi == 0 and Wyi == 0):
             u[ii] = x[ii]
             v[ii] = y[ii]
             continue
         
-        elif abs(Ii) < tol :
-            if abs(Wxi) < tol :
+        elif Ii == 0 :
+            if Wxi == 0 :
                 u[ii] = x[ii]
                 v[ii] = 0.
-            elif abs(Wyi) < tol :
+            elif Wyi == 0 :
                 u[ii] = 0.
                 v[ii] = y[ii]
             else :
@@ -263,7 +260,7 @@ def project_2D_Ellipse_arrays_cython_test(np.ndarray[Ctype_float, ndim=1] x,
                 v[ii] = 0.
             continue
 
-        elif abs(Wxi) < tol :
+        elif Wxi == 0 :
             u[ii] = x[ii]
             if y[ii] < 0 :
                 # how do we know if this is safe?
@@ -272,7 +269,7 @@ def project_2D_Ellipse_arrays_cython_test(np.ndarray[Ctype_float, ndim=1] x,
                 v[ii] =  sqrt(Ii)/sqrt(Wyi)
             continue
         
-        elif abs(Wyi) < tol :
+        elif Wyi == 0 :
             v[ii] = y[ii]
             if x[ii] < 0 :
                 u[ii] = -sqrt(Ii)/sqrt(Wxi)
@@ -280,20 +277,18 @@ def project_2D_Ellipse_arrays_cython_test(np.ndarray[Ctype_float, ndim=1] x,
                 u[ii] =  sqrt(Ii)/sqrt(Wxi)
             continue
 
-        elif abs(x[ii]) < tol and (Wxi < Wyi):
-            u[ii] = x[ii]
+        elif x[ii] == 0 and (Wxi < Wyi):
             if y[ii] < 0 :
-                v[ii] = -sqrt(Ii)/sqrt(Wyi)
+                y[ii] = -sqrt(Ii)/sqrt(Wyi)
             else :
-                v[ii] =  sqrt(Ii)/sqrt(Wyi)
+                y[ii] =  sqrt(Ii)/sqrt(Wyi)
             continue
         
-        elif abs(y[ii]) < tol and (Wyi < Wxi):
-            v[ii] = y[ii]
+        elif y[ii] == 0 and (Wyi < Wxi):
             if x[ii] < 0 :
-                u[ii] = -sqrt(Ii)/sqrt(Wxi)
+                x[ii] = -sqrt(Ii)/sqrt(Wxi)
             else :
-                u[ii] =  sqrt(Ii)/sqrt(Wxi)
+                x[ii] =  sqrt(Ii)/sqrt(Wxi)
             continue
                  
         # transpose axes so that e0 > e1 
@@ -335,7 +330,8 @@ def project_2D_Ellipse_arrays_cython_test(np.ndarray[Ctype_float, ndim=1] x,
         else :
             x_inv = 0
             
-        if abs(yp) < tol :
+        if yp == 0. :
+            #print('yp==0')
             n0 = ep0 * xp
             n1 = e0_sq - e1_sq
             if n0 < n1 :
@@ -358,7 +354,7 @@ def project_2D_Ellipse_arrays_cython_test(np.ndarray[Ctype_float, ndim=1] x,
             
             g = z0*z0 + z1*z1 - 1.
 
-            if abs(g) < tol :
+            if g == 0 :
                 u[ii] = x[ii]
                 v[ii] = y[ii]
                 continue
@@ -446,14 +442,14 @@ def project_2D_Ellipse_arrays_cython_test(np.ndarray[Ctype_float, ndim=1] x,
 
         #n0 = xp2-x[ii]
         #n1 = yp2-y[ii]
-        #if abs(n0) > tol and abs(n1) > tol :
+        #if n0 > 0 and n1 > 0 :
         #    nn = float_max(n0, n1)
         #    r0 = nn * sqrt((n0/nn)**2 + (n1/nn)**2)
         #else :
         #    r0 = sqrt(n0**2 + n1**2)
         #n0 = xp-x[ii]
         #n1 = yp-y[ii]
-        #if abs(n0) > tol and abs(n1) > tol :
+        #if n0 > 0 and n1 > 0 :
         #    nn = float_max(n0, n1)
         #    r1 = nn * sqrt((n0/nn)**2 + (n1/nn)**2)
         #else :
