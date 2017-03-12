@@ -23,8 +23,14 @@ def make_exp(sigma, shape):
     i, j, k = np.meshgrid(np.fft.fftfreq(shape[0], 1.), \
                           np.fft.fftfreq(shape[1], 1.), \
                           np.fft.fftfreq(shape[2], 1.), indexing='ij')
-
-    exp     = np.exp(-4. * sigma**2 * np.pi**2 * (i**2 + j**2 + k**2))
+    if sigma is np.inf :
+        print('sigma is inf setting exp = 0')
+        exp     = np.zeros(i.shape, dtype=np.float)
+    elif sigma == 0. :
+        print('sigma is 0 setting exp = 1')
+        exp     = np.ones(i.shape, dtype=np.float)
+    else :
+        exp     = np.exp(-4. * sigma**2 * np.pi**2 * (i**2 + j**2 + k**2))
     return exp
 
 def generate_diff(solid_unit, unit_cell, N, sigma, **params):
