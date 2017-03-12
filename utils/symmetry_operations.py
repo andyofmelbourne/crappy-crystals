@@ -118,6 +118,7 @@ class P212121():
         self.translations_conj = None
         self.no_solid_units = 4
         
+        self.Pat_sym_ops   = 8
         self.unitcell_size = unitcell_size
         self.det_shape     = det_shape
         

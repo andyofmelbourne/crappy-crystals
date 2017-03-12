@@ -30,7 +30,7 @@ sys.path.append(os.path.join(root, 'utils'))
 import io_utils
 import duck_3D
 import forward_sim
-from calculate_constraint_ratio import calculate_constraint_ratio
+import calculate_constraint_ratio
 
 def parse_cmdline_args(default_config='forward_model.ini'):
     parser = argparse.ArgumentParser(description='calculate the forward model diffraction intensity for a disorded crystal. The results are output into a .h5 file.')
@@ -106,66 +106,15 @@ if __name__ == '__main__':
     del params['n']
     del params['sigma']
     del params['solid_unit']
+
+    solid_unit.fill(0)
+    solid_unit[:unit_cell[0]//2, :unit_cell[1]//2, :unit_cell[2]] = 1.
     
     # calculate the diffraction data and metadata
     #############################################
     diff, info = forward_sim.generate_diff(solid_unit, unit_cell, N, sigma, **params)
-    
-    # calculate the constraint ratio
-    ################################
-    omega_con, omega_Bragg, omega_global  = calculate_constraint_ratio(info['support'], params['space_group'], unit_cell)
-    info['omega_continuous'] = omega_con
-    info['omega_Bragg']      = omega_Bragg
-    info['omega_global']     = omega_global
-                               
-    # output
-    ########
-    outputdir = os.path.split(os.path.abspath(args.filename))[0]
 
-    # mkdir if it does not exist
-    if not os.path.exists(outputdir):
-        os.makedirs(outputdir)
-    
-    f = h5py.File(fnam)
-    
-    group = '/forward_model'
-    if group not in f:
-        f.create_group(group)
-    
-    # diffraction data
-    key = group+'/data'
-    if key in f :
-        del f[key]
-    f[key] = diff
-    
-    # solid unit
-    key = group+'/solid_unit'
-    if key in f :
-        del f[key]
-    f[key] = solid_unit
-    
-    # everything else
-    for key, value in info.items():
-        if value is None :
-            continue 
-        
-        h5_key = group+'/'+key
-        if h5_key in f :
-            del f[h5_key]
-        
-        try :
-            print('writing:', h5_key, type(value))
-            f[h5_key] = value
-        
-        except Exception as e :
-            print('could not write:', h5_key, ':', e)
-        
-    f.close() 
-    
-    # copy the config file
-    ######################
-    try :
-        import shutil
-        shutil.copy(args.config, outputdir)
-    except Exception as e :
-        print(e)
+    # omega
+    omega_con, omega_C, omega_Bragg, omega_global, A_sup, C_sup  = calculate_constraint_ratio.calculate_constraint_ratio(info['support'], params['space_group'], unit_cell)
+    print(omega_con, omega_C, omega_Bragg, omega_global)
+
