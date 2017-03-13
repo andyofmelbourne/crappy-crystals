@@ -382,8 +382,6 @@ class Mapper_ellipse():
         kk = kk[Bragg_mask]
         
         sBragg = s[Bragg_mask]
-        e0_inf = self.e0_inf[Bragg_mask] == 0 
-        e1_inf = self.e1_inf[Bragg_mask] == 0 
         modes  = np.empty((self.modes.shape[0],)+s[Bragg_mask].shape, dtype=self.modes.dtype)
         amp    = self.amp[Bragg_mask] 
         if self.mask is not 1 :
@@ -411,7 +409,7 @@ class Mapper_ellipse():
                     I += unit_cell_weighting * (U * U.conj()).real
                     
                     # Emod
-                    mask      = mask * e0_inf * e1_inf
+                    mask      = mask 
                     eMod      = np.sum( mask * ( np.sqrt(I) - amp )**2 )
                     eMod      = np.sqrt( eMod / I_norm )
 
