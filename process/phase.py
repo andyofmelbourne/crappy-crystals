@@ -69,6 +69,7 @@ def phase(mapper, iters_str = '100DM 100ERA', beta=1):
     """
     alg_iters = config_iters_to_alg_num(iters_str)
     
+    Cheshire_error_map = None
     eMod = []
     eCon = []
     O = mapper.O
@@ -84,9 +85,13 @@ def phase(mapper, iters_str = '100DM 100ERA', beta=1):
         
         if alg == 'cheshire':
            O, info = mapper.scans_cheshire(O, steps=[1,1,1])
+           Cheshire_error_map = info['error_map'].copy()
          
         eMod += info['eMod']
         eCon += info['eCon']
+
+    if Cheshire_error_map is not None :
+        info['Cheshire_error_map'] = Cheshire_error_map
     
     return O, mapper, eMod, eCon, info
 
@@ -159,12 +164,22 @@ if __name__ == '__main__':
         support = None
     else :
         support = f[params['support']][()]
+        
+    if params['bragg_weighting'] is None or params['bragg_weighting'] is False :
+        bragg_weighting = None
+    else :
+        bragg_weighting = f[params['bragg_weighting']][()]
+
+    if params['diffuse_weighting'] is None or params['diffuse_weighting'] is False :
+        diffuse_weighting = None
+    else :
+        diffuse_weighting = f[params['diffuse_weighting']][()]
 
     # make the mapper
     #################
     mapper = maps.Mapper_ellipse(f[params['data']][()], 
-                                 Bragg_weighting   = f[params['bragg_weighting']][()], 
-                                 diffuse_weighting = f[params['diffuse_weighting']][()], 
+                                 Bragg_weighting   = bragg_weighting, 
+                                 diffuse_weighting = diffuse_weighting, 
                                  solid_unit        = solid_unit,
                                  voxels            = voxels,
                                  overlap           = params['overlap'],
@@ -188,6 +203,7 @@ if __name__ == '__main__':
     if not os.path.exists(outputdir):
         os.makedirs(outputdir)
     
+    print('writing to:', args.filename)
     f = h5py.File(args.filename)
     
     group = '/phase'
@@ -205,48 +221,6 @@ if __name__ == '__main__':
     if key in f :
         del f[key]
     f[key] = mapper.sym_ops.solid_to_crystal_real(O)
-
-    # e0
-    key = group+'/e0'
-    if key in f :
-        del f[key]
-    f[key] = mapper.e0
-
-    # e1
-    key = group+'/e1'
-    if key in f :
-        del f[key]
-    f[key] = mapper.e1
-
-    # e0_inf
-    key = group+'/e0_inf'
-    if key in f :
-        del f[key]
-    f[key] = mapper.e0_inf
-
-    # e1_inf
-    key = group+'/e1_inf'
-    if key in f :
-        del f[key]
-    f[key] = mapper.e1_inf
-    
-    # mask * (sqrt(M) - amp)**2
-    #key = group+'/diff_amp'
-    #if key in f :
-    #    del f[key]
-    #f[key] = mapper.M
-
-    # yp
-    #key = group+'/yp'
-    #if key in f :
-    #    del f[key]
-    #f[key] = (mapper.yp - mapper.amp)
-
-    # I0
-    key = group+'/I0'
-    if key in f :
-        del f[key]
-    f[key] = mapper.I0
 
     del info['eMod']
     del info['eCon']

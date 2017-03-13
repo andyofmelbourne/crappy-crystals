@@ -101,11 +101,11 @@ def ERA(iters, **args):
         print('\n\nalgrithm progress iteration convergence modulus error')
     
     for i in range(iters) :
-        O0 = mapper.O.copy()
-        
         # modulus projection 
         # ------------------
         modes = mapper.Pmod(modes)
+        
+        modes_mod = modes.copy()
         
         # support projection 
         # ------------------
@@ -118,8 +118,8 @@ def ERA(iters, **args):
         eMod    = mapper.Emod(modes)
         #eMod = 0
         
-        dO   = mapper.O - O0
-        eCon = mapper.l2norm(dO, O0)
+        dO   = modes - modes_mod
+        eCon = mapper.l2norm(dO, modes)
         
         if rank == 0 : update_progress(i / max(1.0, float(iters-1)), 'ERA', i, eCon, eMod )
         

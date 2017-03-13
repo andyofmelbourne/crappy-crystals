@@ -563,7 +563,7 @@ class Forward_model_widget(QtGui.QWidget):
             # real-space crystal view 
             #########################
             #cryst = self.f['/forward_model/solid_unit'][()].real
-            cryst = self.f[self.crystal_path][()].real
+            cryst = np.abs(self.f[self.crystal_path][()])
             #cryst = np.fft.fftshift(cryst)
             # add 10 pix padding
             padd = np.zeros((10, cryst.shape[0]), dtype=cryst.real.dtype)
@@ -695,7 +695,7 @@ class Phase_widget(QtGui.QWidget):
             # real-space crystal view 
             #########################
             #cryst = self.f['/forward_model/solid_unit'][()].real
-            cryst = self.f[self.crystal_path][()].real
+            cryst = np.abs(self.f[self.crystal_path][()])
             #cryst = np.fft.fftshift(cryst)
             # add 10 pix padding
             padd = np.zeros((10, cryst.shape[0]), dtype=cryst.real.dtype)
@@ -728,6 +728,140 @@ class Phase_widget(QtGui.QWidget):
 
         if init :
             return splitter
+
+class Ellipse_projections_widget(QtGui.QWidget):
+    def __init__(self, filename):
+        super(Ellipse_projections_widget, self).__init__()
+        
+        config_dict = load_config(filename, name = 'ellipse_projections.ini')
+        self.initUI(filename, config_dict)
+
+    def initUI(self, filename, config_dict):
+        """
+        """
+        # get the output directory
+        self.output_dir = os.path.split(filename)[0]
+        self.config_filename = os.path.join(self.output_dir, 'ellipse_projections.ini')
+        self.filename = filename
+        
+        # Make a grid layout
+        layout = QtGui.QGridLayout()
+        
+        # add the layout to the central widget
+        self.setLayout(layout)
+        
+        # plots
+        #######
+        self.group = '/ellipse_projections'
+        self.displayW     = self.display(init=True)
+        
+        # config widget
+        ###############
+        self.config_widget = Write_config_file_widget(config_dict, self.config_filename)
+
+        # run command widget
+        ####################
+        self.run_command_widget = Run_and_log_command()
+        self.run_command_widget.finished_signal.connect(lambda : self.display(init=False))
+        
+        # run command button
+        ####################
+        self.run_button = QtGui.QPushButton('project', self)
+        self.run_button.clicked.connect(self.run_button_clicked)
+        
+        # add a spacer for the labels and such
+        verticalSpacer = QtGui.QSpacerItem(20, 40, QtGui.QSizePolicy.Minimum, QtGui.QSizePolicy.Expanding)
+        
+        # set the layout
+        ################
+        layout.addWidget(self.displayW,            0, 1, 5, 1)
+        layout.addWidget(self.config_widget,       0, 0, 1, 1)
+        layout.addWidget(self.run_button,          1, 0, 1, 1)
+        #layout.addWidget(self.ref_button,          2, 0, 1, 1)
+        #layout.addWidget(self.set_button,          3, 0, 1, 1)
+        layout.addItem(verticalSpacer,             4, 0, 1, 1)
+        layout.addWidget(self.run_command_widget,  5, 0, 1, 2)
+        #layout.addWidget(self.run_ref_widget,      6, 0, 1, 2)
+        layout.setColumnStretch(1, 1)
+        layout.setColumnMinimumWidth(0, 250)
+        self.layout = layout
+
+    def run_button_clicked(self):
+        # write the config file 
+        #######################
+        self.config_widget.write_file()
+    
+        # Run the command 
+        #################
+        py = os.path.join(root, 'process/ellipse_projections.py')
+        cmd = 'python ' + py + ' -f ' + self.filename + ' -c ' + self.config_filename
+        self.run_command_widget.run_cmd(cmd)
+    
+    def display(self, init=False):
+        self.f = h5py.File(self.filename, 'r')
+        
+        if init :
+            self.plot = pg.PlotWidget(title = 'ellipse projections')
+            #self.plot = pg.plot(title = 'ellipse projections')
+            self.im_init = False
+            self.plot.setAspectLocked()
+             
+        if self.group in self.f :
+            self.plot.clear()
+            g = self.f[self.group]
+            print(self.group, init)
+            
+            # plot the ellipse
+            Wx = g['Wx'][0]
+            Wy = g['Wy'][0]
+            I  = g['I'][0]
+            x  = g['x'][0]
+            y  = g['y'][0]
+            xp = g['xp'][0]
+            yp = g['yp'][0]
+            
+            tol = 1.0e-8
+            if Wx > tol and Wy > tol :
+                N  = 10000
+                xs = np.linspace(-(1.-1./N)*np.sqrt(I)/np.sqrt(Wx), np.sqrt(I)/np.sqrt(Wx), 10000, endpoint=False)
+                
+                y1s = np.sqrt(I - Wx * xs**2)/np.sqrt(Wy)
+                y1s = np.array([0] + list(y1s) + [0])
+                y2s = -y1s
+                
+                xs = [-np.sqrt(I)/np.sqrt(Wx)] + list(xs) + [np.sqrt(I)/np.sqrt(Wx)]
+                xs = np.array(xs)
+                
+                self.plot.plot(xs, y1s, pen=pg.mkPen('b'))
+                self.plot.plot(xs, y2s, pen=pg.mkPen('b'))
+                
+            elif Wx > tol and Wy < tol :
+                xs = [-np.sqrt(I)/np.sqrt(Wx), np.sqrt(I)/np.sqrt(Wx)]
+                ys = [-3*xs[0], 3*xs[0]]
+                self.plot.plot([xs[0], xs[0]], ys, pen=pg.mkPen('b'))
+                self.plot.plot([xs[1], xs[1]], ys, pen=pg.mkPen('b'))
+            
+            elif Wx < tol and Wy > tol :
+                ys = [-np.sqrt(I)/np.sqrt(Wy), np.sqrt(I)/np.sqrt(Wy)]
+                xs = [-3*ys[0], 3*ys[0]]
+                self.plot.plot(xs, [ys[0], ys[0]], pen=pg.mkPen('b'))
+                self.plot.plot(xs, [ys[1], ys[1]], pen=pg.mkPen('b'))
+            
+            else :
+                self.plot.plot([0,0], [0,0], pen=pg.mkPen('b'))
+
+            # plot the projected line
+            self.plot.plot([x, xp], [y, yp], pen=pg.mkPen('y'))
+            self.plot.showGrid(x=True, y=True)
+
+            if 'xp_rand' in g.keys() and 'x_rand' in g.keys():
+                for x, y, xp, yp in zip(g['x_rand'][()], g['y_rand'][()], g['xp_rand'][()], g['yp_rand'][()]):
+                    self.plot.plot([x, xp], [y, yp], pen=pg.mkPen('c'))
+             
+        self.f.close()
+
+        if init :
+            return self.plot
 
 class Run_and_log_command(QtGui.QWidget):
     """
@@ -806,15 +940,15 @@ class Run_and_log_command(QtGui.QWidget):
             
             # emmit a signal when complete
             self.finished_signal.emit(True)
-            print('Output   :', self.output)
+            print('Output   :', self.output.decode("utf-8"))
             
         else :
             self.status_label.setText(str(status))
             
             # get the output and error msg
             self.output, self.err_msg = self.p.communicate()
-            print('Output   :', self.output)
-            print('Error msg:', self.err_msg)
+            print('Output   :', self.output.decode("utf-8"))
+            print('Error msg:', self.err_msg.decode("utf-8"))
             
             # emmit a signal when complete
             self.finished_signal.emit(False)

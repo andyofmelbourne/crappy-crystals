@@ -156,6 +156,7 @@ def DM(iters, beta = 1, **args):
     modes  = mapper.modes
     
     modes_sup = mapper.Psup(modes)
+    modes_mod = None
 
     if iters > 0  and rank==0:
         print('\n\nalgrithm progress iteration convergence modulus error')
@@ -226,8 +227,11 @@ def DM(iters, beta = 1, **args):
     info['eMod']  = eMods
     info['eCon']  = eCons
     
-    a = mapper.Pmod(modes_sup + 1/beta * (modes_sup - modes))
-    info.update(mapper.finish(a))
+    #a = mapper.Pmod(modes_sup + 1/beta * (modes_sup - modes))
+    if modes_mod is None :
+        modes_mod = mapper.Pmod(modes)
+    b = mapper.Psup(modes_mod - 1/beta * (modes_mod - modes))
+    info.update(mapper.finish(b))
     
     O = mapper.O
     
