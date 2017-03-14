@@ -206,8 +206,9 @@ if __name__ == '__main__':
     else :
         f = h5py.File(params['input_file'])
     
-    if '/forward_model/solid_unit' in f.keys():
+    if '/forward_model/solid_unit' in f:
         fids, fids_trans = [], []
+        O = h5py.File('duck_both/duck_both.h5.bak')['/phase/solid_unit'][()]
         for o in mapper.sym_ops.solid_syms_real(O):
             fid, fid_trans = fidelity.calculate_fidelity(f['/forward_model/solid_unit'][()], O)
             fids.append(fid)
