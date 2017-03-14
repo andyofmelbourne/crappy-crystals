@@ -33,6 +33,8 @@ import duck_3D
 import forward_sim
 import phasing_3d
 import maps
+import fidelity
+
 
 def config_iters_to_alg_num(string):
     # split a string like '100ERA 200DM 50ERA' with the numbers
@@ -139,6 +141,8 @@ if __name__ == '__main__':
     ################
     if params['input_file'] is None :
         f = h5py.File(args.filename)
+    else :
+        f = h5py.File(params['input_file'])
 
     I = f[params['data']][()]
     
@@ -195,6 +199,23 @@ if __name__ == '__main__':
     #######
     O, mapper, eMod, eCon, info = phase(mapper, params['iters'], params['beta'])
 
+    # calculate the fidelity if we have the ground truth
+    ####################################################
+    if params['input_file'] is None :
+        f = h5py.File(args.filename)
+    else :
+        f = h5py.File(params['input_file'])
+    
+    if '/forward_model/solid_unit' in f.keys():
+        fids, fids_trans = [], []
+        for o in mapper.sym_ops.solid_syms_real(O):
+            fid, fid_trans = fidelity.calculate_fidelity(f['/forward_model/solid_unit'][()], O)
+            fids.append(fid)
+            fids_trans.append(fid_trans)
+        i         = np.argmin(np.array(fids_trans))
+        info['fidelity'] = fids[i]
+        info['fidelity_trans'] = fids_trans[i]
+    
     # output
     ########
     outputdir = os.path.split(os.path.abspath(args.filename))[0]
