@@ -13,6 +13,52 @@ except NameError :
 
 import numpy as np
 
+def R_scale_data(diff, is_fft_shifted = True):
+    if is_fft_shifted is False :
+        diff_out = np.fft.ifftshift(diff.copy())
+    else :
+        diff_out = diff.copy()
+    
+    i = np.fft.fftfreq(diff.shape[0]) * diff.shape[0]
+    j = np.fft.fftfreq(diff.shape[1]) * diff.shape[1]
+    k = np.fft.fftfreq(diff.shape[2]) * diff.shape[2]
+    i, j, k = np.meshgrid(i, j, k, indexing='ij')
+    R       = np.sqrt(i**2 + j**2 + k**2)
+    R[0, 0, 0] = 0.5
+    
+    # R scaling
+    R_scale   = 3. * ((R+1.)**2 - R**2) / ((R+1.)**3 - R**3)
+    diff_out  = diff_out * R_scale
+    return diff_out, R_scale
+
+def mask_courners(shape, is_fft_shifted=True):
+    i = np.fft.fftfreq(shape[0]) * shape[0]
+    j = np.fft.fftfreq(shape[1]) * shape[1]
+    k = np.fft.fftfreq(shape[2]) * shape[2]
+    i, j, k = np.meshgrid(i, j, k, indexing='ij')
+    R       = np.sqrt(i**2 + j**2 + k**2)
+    
+    # mask courners 
+    mask = np.ones(shape, dtype = np.bool)
+    if remove_courners :
+        l           = np.where(R >= np.min(shape) / 2.)
+        mask[l]     = False
+    return mask
+
+def add_poisson_noise(diff, n, renormalise=True):
+    # normalise
+    norm     = np.sum(diff)
+    diff_out = diff.copy() / norm
+    
+    # Poisson sampling
+    diff_out = np.random.poisson(lam = float(n) * diff_out).astype(np.float64)
+
+    if renormalise :
+        diff_out = diff_out / np.sum(diff_out) * norm
+    return diff_out
+    
+    
+
 def add_noise_3d(diff, n, is_fft_shifted = True, remove_courners = True, unit_cell_size=None):
     """
     Add Poisson noise to a 3d volume.
@@ -37,67 +83,19 @@ def add_noise_3d(diff, n, is_fft_shifted = True, remove_courners = True, unit_ce
     This is not valid for the courners of the 
     detector that are sampled much less.
     """
-    if is_fft_shifted is False :
-        diff_out = np.fft.ifftshift(diff.copy())
-    else :
-        diff_out = diff.copy()
+    # R-scale
+    diff_out, R_scale = R_scale_data(diff, is_fft_shifted)
 
-    print('diff[0,0,0]:', diff[0,0,0])
+    # poisson sampling
+    diff_out = add_poisson_noise(diff_out, n, renormalise=False)
     
-    norm = np.sum(diff)
-    
-    mask = np.ones_like(diff, dtype = np.bool)
-    
-    i = np.fft.fftfreq(diff.shape[0]) * diff.shape[0]
-    j = np.fft.fftfreq(diff.shape[1]) * diff.shape[1]
-    k = np.fft.fftfreq(diff.shape[2]) * diff.shape[2]
-    i, j, k = np.meshgrid(i, j, k, indexing='ij')
-    R      = np.sqrt(i**2 + j**2 + k**2)
-    R[0, 0, 0] = 0.5
-    
-    # R scaling
-    R_scale   = 3. * ((R+1.)**2 - R**2) / ((R+1.)**3 - R**3)
-    diff_out  = diff_out * R_scale
-
-    # normalise
-    dsum = np.sum(diff_out)
-    diff_out = diff_out / dsum
-    print('sum of diffraction intensity after R-scaling:', dsum)
-
-    # calculate the total number of photons
-    # from the mean number of photons per speckle
-    # at the edge of the detector
-    if unit_cell_size is not None :
-        # ratio of diff vol to unit_cell vol
-        over_sampling = float(diff.size) / float(unit_cell_size[0]*unit_cell_size[1]*unit_cell_size[2]) 
-    else :
-        over_sampling = 2.
-
-    """
-    rav = rad_av(diff_out)
-    N = float(n) / (over_sampling * rav[int(np.min(diff.shape) / 2. - 1.)])
-    """
-    N = float(n)
-    print('total number of photons required:', int(N))
-    print('oversampling :', over_sampling)
-
-    # Poisson sampling
-    diff_out = np.random.poisson(lam = N * diff_out).astype(np.float64)
-
-    # un-scale
-    #R_scale  /= np.mean(R_scale) 
+    # un-R-scale
     diff_out /= R_scale
-
+    
     # renormalise
-    diff_out = diff_out * norm / np.sum(diff_out)
-
-    if remove_courners :
-        l = np.where(R >= np.min(diff.shape) / 2.)
-        diff_out[l] = 0.0
-        mask[l]     = False
-
-    print('diff_out[0,0,0]:', diff_out[0,0,0])
-    return diff_out, mask
+    diff_out = diff_out / np.sum(diff_out) * np.sum(diff)
+    
+    return diff_out
 
 def rad_av(diff, rs = None, is_fft_shifted = True):
     if rs is None :

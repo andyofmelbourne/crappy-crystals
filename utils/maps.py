@@ -339,7 +339,7 @@ class Mapper_ellipse():
             den += np.sum( (array0[i] * array0[i].conj()).real ) 
         return np.sqrt(num / den)
 
-    def scans_cheshire(self, solid, steps=[1,1,1], unit_cell=False, err = 'Emod'):
+    def scans_cheshire(self, solid, scan_points=None, err = 'Emod'):
         """
         scan the solid unit through the cheshire cell 
         until the best agreement with the data is found.
@@ -347,11 +347,17 @@ class Mapper_ellipse():
         if err == 'Emod' :
             err = self.Emod 
         
-        I, J, K = self.sym_ops.unitcell_size
-        if unit_cell is False :
-            I, J, K = self.sym_ops.Cheshire_cell
+        if scan_points is not None :
+            #I, J, K = self.sym_ops.Cheshire_cell
+            I = scan_points[0]
+            J = scan_points[1]
+            K = scan_points[2]
+        else :
+            I = range(self.sym_ops.unitcell_size[0])
+            J = range(self.sym_ops.unitcell_size[1])
+            K = range(self.sym_ops.unitcell_size[2])
         
-        errors = np.zeros((I, J, K), dtype=np.float)
+        errors = np.zeros((len(I), len(J), len(K)), dtype=np.float)
         errors.fill(np.inf)
         
         # only evaluate the error on Bragg peaks that are strong 
@@ -392,9 +398,9 @@ class Mapper_ellipse():
         diffuse_weighting    = self.diffuse_weighting[Bragg_mask]
         unit_cell_weighting  = self.unit_cell_weighting[Bragg_mask]
         
-        for i in range(0, I, steps[0]):
-            for j in range(0, J, steps[1]):
-                for k in range(0, K, steps[2]):
+        for i in I:
+            for j in J:
+                for k in K:
                     phase_ramp = np.exp(- 2J * np.pi * (i * qi + j * qj + k * qk))
                      
                     s1[Bragg_mask] = sBragg * phase_ramp
@@ -405,15 +411,15 @@ class Mapper_ellipse():
                     # I map
                     U  = np.sum(modes, axis=0)
                      
-                    I  = diffuse_weighting   * np.sum( (modes * modes.conj()).real, axis=0)
-                    I += unit_cell_weighting * (U * U.conj()).real
+                    diff  = diffuse_weighting   * np.sum( (modes * modes.conj()).real, axis=0)
+                    diff += unit_cell_weighting * (U * U.conj()).real
                     
                     # Emod
                     mask      = mask 
-                    eMod      = np.sum( mask * ( np.sqrt(I) - amp )**2 )
+                    eMod      = np.sum( mask * ( np.sqrt(diff) - amp )**2 )
                     eMod      = np.sqrt( eMod / I_norm )
 
-                    errors[i, j, k] = eMod
+                    errors[i - I[0], j - J[0], k - K[0]] = eMod
         
         l = np.argmin(errors)
         i, j, k = np.unravel_index(l, errors.shape)
@@ -423,9 +429,9 @@ class Mapper_ellipse():
         qi = np.fft.fftfreq(s.shape[0]) 
         qj = np.fft.fftfreq(s.shape[1])
         qk = np.fft.fftfreq(s.shape[2])
-        T0 = np.exp(- 2J * np.pi * i * qi)
-        T1 = np.exp(- 2J * np.pi * j * qj)
-        T2 = np.exp(- 2J * np.pi * k * qk)
+        T0 = np.exp(- 2J * np.pi * I[i] * qi)
+        T1 = np.exp(- 2J * np.pi * J[j] * qj)
+        T2 = np.exp(- 2J * np.pi * K[k] * qk)
         phase_ramp = reduce(np.multiply.outer, [T0, T1, T2])
         s1         = s * phase_ramp
         

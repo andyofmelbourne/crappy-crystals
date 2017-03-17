@@ -86,7 +86,7 @@ def phase(mapper, iters_str = '100DM 100ERA', beta=1):
            O, info = phasing_3d.DM(iters, mapper = mapper, beta=beta)
         
         if alg == 'cheshire':
-           O, info = mapper.scans_cheshire(O, steps=[1,1,1])
+           O, info = mapper.scans_cheshire(O, scan_points=[range(-3,3,1),range(-3,3,1),range(-3,3,1)])
            Cheshire_error_map = info['error_map'].copy()
          
         eMod += info['eMod']
@@ -208,7 +208,7 @@ if __name__ == '__main__':
     
     if '/forward_model/solid_unit' in f:
         fids, fids_trans = [], []
-        O = h5py.File('duck_both/duck_both.h5.bak')['/phase/solid_unit'][()]
+        #O = h5py.File('duck_both/duck_both.h5.bak')['/phase/solid_unit'][()]
         for o in mapper.sym_ops.solid_syms_real(O):
             fid, fid_trans = fidelity.calculate_fidelity(f['/forward_model/solid_unit'][()], O)
             fids.append(fid)
@@ -219,14 +219,19 @@ if __name__ == '__main__':
     
     # output
     ########
-    outputdir = os.path.split(os.path.abspath(args.filename))[0]
+    if params['output_file'] is not None or params['output_file'] is not False :
+        filename = params['output_file']
+    else :
+        filename = args.filename
+
+    outputdir = os.path.split(os.path.abspath(filename))[0]
 
     # mkdir if it does not exist
     if not os.path.exists(outputdir):
         os.makedirs(outputdir)
     
-    print('writing to:', args.filename)
-    f = h5py.File(args.filename)
+    print('writing to:', filename)
+    f = h5py.File(filename)
     
     group = '/phase'
     if group not in f:

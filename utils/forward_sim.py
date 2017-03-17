@@ -147,6 +147,12 @@ def generate_diff(solid_unit, unit_cell, N, sigma, **params):
         'diffuse_weighting' : numpy.ndarray, float
             (1 - exp)
         
+        'solvent_content' : float
+            The ratio: no. of voxels outside samples / number of voxels
+        
+        'solvent_content_support' : float
+            The ratio: no. of voxels outside sample supports / number of voxels
+        
         'sym' : class object 
             an object for performing symmetry operations on the solid unit
     """
@@ -219,14 +225,44 @@ def generate_diff(solid_unit, unit_cell, N, sigma, **params):
     print('integrated intensity of the diffuse scatter  :', Dsum)
     print('fractional total intensity of the Bragg reflections:', Bsum / (Bsum+Dsum))
     print('fractional total intensity of the diffuse scatter  :', Dsum / (Bsum+Dsum))
-    diff = B + D
     
     # add photon counting noise
     ###########################
     if io_utils.isValid('photons', params) :
-        diff, edges = add_noise_3d.add_noise_3d(diff, params['photons'], \
-                                      remove_courners = params['cut_courners'],\
-                                      unit_cell_size = unit_cell)
+        # R-scale data
+        B_rscale, R_scale = add_noise_3d.R_scale_data(B)
+        D_rscale, R_scale = add_noise_3d.R_scale_data(D)
+        
+        # add noise
+        B_norm    = np.sum(B_rscale)
+        D_norm    = np.sum(D_rscale)
+        norm      = B_norm + D_norm
+        B_photons = params['photons'] * B_norm / norm
+        D_photons = params['photons'] * D_norm / norm
+        B_rscale = add_noise_3d.add_poisson_noise(B_rscale, B_photons)
+        D_rscale = add_noise_3d.add_poisson_noise(D_rscale, D_photons)
+        print('\nnumber of photons for Bragg   diffraction:', B_photons)
+        print('number of photons for diffuse diffraction:', D_photons)
+        print('total number of photons for diffraction  :', params['photons'])
+        assert((B_photons + D_photons) == params['photons'])
+
+        
+        # un-scale 
+        B_rscale /= R_scale
+        D_rscale /= R_scale
+        
+        # renormalse
+        B = B_rscale / np.sum(B_rscale) * Bsum
+        D = D_rscale / np.sum(D_rscale) * Dsum
+        diff = B + D
+    else :
+        diff = B + D
+
+    if io_utils.isValid('cut_courners', params) :
+        edges = add_noise_3d.mask_courners(diff.shape)
+        diff *= edges
+        B    *= edges
+        D    *= edges
     else :
         edges = np.ones_like(diff, dtype=np.bool)
     
@@ -252,19 +288,27 @@ def generate_diff(solid_unit, unit_cell, N, sigma, **params):
     else :
         beamstop = np.ones_like(diff, dtype=np.bool)
         
-    # testing
-    #beamstop = lattice > 1.0e-1
-    #diff    *= beamstop
-    
     # make the unit-cell in the field-of-view
-    #
     # make the crystal in the field-of-view
     #########################################
     crystal_ar, unit_cell_ar = sym_ops.solid_to_crystal_real(solid_unit, return_unit=True)
     
-    voxels = np.sum(solid_unit > 0.)
+    # no. of voxels and solvent content
+    voxels           = np.sum(solid_unit > 0.)
+    voxels_sup       = np.sum(support > 0.)
+    voxels_unit_cell = np.prod(unit_cell)
+    solvent_sample   = 1. - sym_ops.no_solid_units * voxels     / float(voxels_unit_cell)
+    solvent_support  = 1. - sym_ops.no_solid_units * voxels_sup / float(voxels_unit_cell)
+    
     print('Simulation: number of voxels in solid unit:', voxels)
-    print('Simulation: number of voxels in support   :', np.sum(support))
+    print('Simulation: number of voxels in support   :', voxels_sup)
+    print('Simulation: solvent fraction (sample)     :', solvent_sample)
+    print('Simulation: solvent fraction (support)    :', solvent_support)
+
+    if np.any(crystal_ar > 1.) :
+        print('##########################')
+        print('Warning: crystal overlap!!')
+        print('##########################')
     
     info = {}
     info['beamstop']   = beamstop
@@ -278,5 +322,9 @@ def generate_diff(solid_unit, unit_cell, N, sigma, **params):
     info['sym']        = sym_ops
     info['Bragg_weighting']   = Bw
     info['diffuse_weighting'] = Dw
+    info['Bragg_diffraction']   = B
+    info['diffuse_diffraction'] = D
+    info['solvent_content'] = solvent_sample
+    info['solvent_content_support'] = solvent_support
     
     return diff, info
