@@ -263,7 +263,7 @@ def project_2D_Ellipse_arrays_cython_test(np.ndarray[Ctype_float, ndim=1] x,
                 v[ii] = 0.
             continue
 
-        elif Wxi < tol or (Wyi > tol and Wxi/Wyi < tol):
+        elif Wxi < tol:
             u[ii] = x[ii]
             if y[ii] < 0 :
                 # how do we know if this is safe?
@@ -271,8 +271,25 @@ def project_2D_Ellipse_arrays_cython_test(np.ndarray[Ctype_float, ndim=1] x,
             else :
                 v[ii] =  sqrt(Ii)/sqrt(Wyi)
             continue
+
+        elif (Wyi > tol and Wxi/Wyi < tol):
+            yp = sqrt(Ii) / sqrt(Wyi)
+            xp = sqrt(Ii) / sqrt(Wxi)
+            
+            if x[ii] > xp :
+                u[ii] = xp
+            elif x[ii] < -xp :
+                u[ii] = -xp
+            else :
+                u[ii] = x[ii]
+            
+            if y[ii] < 0 :
+                v[ii] = -yp
+            else :
+                v[ii] =  yp
+            continue
         
-        elif Wyi < tol or (Wxi > tol and Wyi/Wxi < tol):
+        elif Wyi < tol :
             v[ii] = y[ii]
             if x[ii] < 0 :
                 u[ii] = -sqrt(Ii)/sqrt(Wxi)
@@ -280,6 +297,23 @@ def project_2D_Ellipse_arrays_cython_test(np.ndarray[Ctype_float, ndim=1] x,
                 u[ii] =  sqrt(Ii)/sqrt(Wxi)
             if abs(Wxi * u[ii]**2 - Ii) > tol*Ii:
                 print('scale:',1./sqrt(Wxi), 'forward I:', Wxi * u[ii]**2, 'I:', Ii)
+            continue
+        
+        elif (Wxi > tol and Wyi/Wxi < tol):
+            yp = sqrt(Ii) / sqrt(Wyi)
+            xp = sqrt(Ii) / sqrt(Wxi)
+            
+            if y[ii] > yp :
+                v[ii] = yp
+            elif y[ii] < -yp :
+                v[ii] = -yp
+            else :
+                v[ii] = y[ii]
+            
+            if x[ii] < 0 :
+                u[ii] = -xp
+            else :
+                u[ii] =  xp
             continue
 
         elif abs(x[ii]) < tol and (Wxi < Wyi):
