@@ -53,7 +53,7 @@ def calculate_constraint_ratio(support, space_group, unit_cell_size):
     u_sup   = np.zeros_like(support)
     u_sup[:unit_cell_size[0], :unit_cell_size[1], :unit_cell_size[2]] = True
     u_sup = np.fft.ifftshift(u_sup)
-    lattice = symmetry_operations.lattice(unit_cell_size, support.shape)
+    lattice = symmetry_operations.make_lattice(unit_cell_size, support.shape)
     U   = np.sum(Us, axis=0)
     Pat = (U.conj() * U).real * lattice
     C   = (Pat - np.sum((Us.conj() * Us).real, axis=0)) * lattice

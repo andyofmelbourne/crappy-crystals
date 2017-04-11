@@ -193,16 +193,18 @@ def generate_diff(solid_unit, unit_cell, N, sigma, **params):
     # generate the diffuse and Bragg weighting modes
     ################################################
     exp     = make_exp(sigma, solid_unit.shape)
-
+    
     # make the lattice
     ##################
-    lattice = symmetry_operations.lattice(unit_cell, solid_unit.shape)
+    lattice = symmetry_operations.make_lattice(unit_cell, solid_unit.shape, N)
+    # normalise by the number of unit cells
+    lattice = lattice / N**3
     if io_utils.isValid('lattice_blur', params) :
         import scipy.ndimage
         lattice = scipy.ndimage.filters.gaussian_filter(lattice, params['lattice_blur'], truncate=10.)
         print('Bluring the lattice function...', lattice.dtype)
-
-    Bw      = N * exp * lattice 
+    
+    Bw      = exp * lattice 
     Dw      = (1. - exp) 
     
     # calculate the Bragg and diffuse scattering
@@ -245,7 +247,6 @@ def generate_diff(solid_unit, unit_cell, N, sigma, **params):
         print('number of photons for diffuse diffraction:', D_photons)
         print('total number of photons for diffraction  :', params['photons'])
         assert((B_photons + D_photons) == params['photons'])
-
         
         # un-scale 
         B_rscale /= R_scale

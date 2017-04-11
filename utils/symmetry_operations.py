@@ -868,7 +868,7 @@ def lattice_old(unit_cell_size, shape):
     
     return lattice
 
-def lattice(unit_cell_size, shape):
+def lattice_old_new(unit_cell_size, shape):
     """
     We should just have delta functions at 1/d
     however, if the unit cell does not divide the 
@@ -876,7 +876,7 @@ def lattice(unit_cell_size, shape):
     pixels. 
     """
     lattice = np.zeros(shape, dtype=np.float)
-
+    
     # generate the q-space coordinates
     qi = np.fft.fftfreq(shape[0])
     qj = np.fft.fftfreq(shape[1])
@@ -885,7 +885,7 @@ def lattice(unit_cell_size, shape):
     ui = np.fft.fftfreq(unit_cell_size[0])
     uj = np.fft.fftfreq(unit_cell_size[1])
     uk = np.fft.fftfreq(unit_cell_size[2])
-
+    
     i = np.zeros_like(qi)
     j = np.zeros_like(qj)
     k = np.zeros_like(qk)
@@ -902,3 +902,40 @@ def lattice(unit_cell_size, shape):
     #print(np.allclose(lattice, lattice_old(unit_cell_size, shape)))
     
     return lattice
+
+
+def make_lattice(u_pix, shape, N = None):
+    """
+    make a finite lattice function in q-space
+    shape = 3D shape of volume    e.g. (128, 64, 32)
+    u_pix = 3D shape of unit cell e.g. (8, 16, 12)
+    N     = number of unit cell's along each axis e.g. 100
+
+    if N is None then assume an infinite lattice
+    """
+    l          = np.zeros(shape, dtype=np.complex64)
+    q0         = np.fft.fftfreq(shape[0]).astype(np.float32)
+    q1         = np.fft.fftfreq(shape[1]).astype(np.float32)
+    q2         = np.fft.fftfreq(shape[2]).astype(np.float32)
+    
+    l0 = np.zeros(shape[0], dtype=np.complex64)
+    l1 = np.zeros(shape[1], dtype=np.complex64)
+    l2 = np.zeros(shape[2], dtype=np.complex64)
+    if N is None :
+        N = 1000
+        infinite = True
+    else :
+        infinite = False
+    
+    for k in range(1, N):
+        print(k)
+        a   = k * np.array(u_pix)
+        l0 += np.exp(2.0J * np.pi * a[0] * q0)
+        l1 += np.exp(2.0J * np.pi * a[1] * q1)
+        l2 += np.exp(2.0J * np.pi * a[2] * q2)
+
+    l = np.multiply.outer(l0, l1)
+    l = np.multiply.outer(l, l2)
+    if infinite :
+        l = (l > 0.5 * l.max()).astype(np.float32)
+    return l 

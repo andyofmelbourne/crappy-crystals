@@ -71,7 +71,7 @@ class Mapper_ellipse():
         Keyword Arguments
         -----------------
         'Bragg_weighting' : numpy.ndarray, float
-            N * lattice * exp
+            lattice * exp
             
         'diffuse_weighting' : numpy.ndarray, float
             (1 - exp)
