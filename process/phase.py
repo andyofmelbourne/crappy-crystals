@@ -219,11 +219,11 @@ if __name__ == '__main__':
     
     # output
     ########
-    if params['output_file'] is not None or params['output_file'] is not False :
+    if params['output_file'] is not None and params['output_file'] is not False :
         filename = params['output_file']
     else :
         filename = args.filename
-
+    
     outputdir = os.path.split(os.path.abspath(filename))[0]
 
     # mkdir if it does not exist

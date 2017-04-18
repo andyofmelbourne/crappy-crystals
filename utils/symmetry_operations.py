@@ -928,14 +928,13 @@ def make_lattice(u_pix, shape, N = None):
         infinite = False
     
     for k in range(1, N):
-        print(k)
         a   = k * np.array(u_pix)
         l0 += np.exp(2.0J * np.pi * a[0] * q0)
         l1 += np.exp(2.0J * np.pi * a[1] * q1)
         l2 += np.exp(2.0J * np.pi * a[2] * q2)
 
     l = np.multiply.outer(l0, l1)
-    l = np.multiply.outer(l, l2)
+    l = np.abs(np.multiply.outer(l, l2))**2
     if infinite :
         l = (l > 0.5 * l.max()).astype(np.float32)
     return l 
