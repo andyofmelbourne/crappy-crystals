@@ -75,6 +75,26 @@ def load_config(filename, name = 'basic_stitch.ini'):
     params = io_utils.parse_parameters(conf)
     return params
 
+def concatenate_projections(volume, pad=10):
+    """
+    concatenate 3 projections of a density along each axis
+    for easy viewing in 2D
+    """
+    N = max(volume.shape[1:])
+    padd = np.zeros((10, N), dtype=volume.dtype)
+    
+    c = []
+    for i in range(len(volume.shape)):
+        p = np.sum(volume,axis=i)
+        t = np.zeros((p.shape[0], N), dtype=volume.dtype)
+        t[:, :p.shape[1]] = p
+        if i < (len(volume.shape) - 1) :
+            c += [t.copy(), padd.copy()]
+        else :
+            c += [t.copy()]
+
+    print([j.shape for j in c])
+    return np.concatenate(tuple(c), axis=0)
 
 class Show_h5_list_widget(QtGui.QWidget):
     def __init__(self, filename, names = None):
@@ -597,6 +617,132 @@ class Forward_model_widget(QtGui.QWidget):
         if init :
             return splitter
 
+class Forward_model_pdb_widget(QtGui.QWidget):
+    def __init__(self, filename):
+        super(Forward_model_pdb_widget, self).__init__()
+        
+        config_dict = load_config(filename, name = 'forward_model_pdb.ini')
+        self.initUI(filename, config_dict)
+
+    def initUI(self, filename, config_dict):
+        """
+        """
+        # get the output directory
+        self.output_dir = os.path.split(filename)[0]
+        self.config_filename = os.path.join(self.output_dir, 'forward_model_pdb.ini')
+        self.filename = filename
+        
+        # Make a grid layout
+        layout = QtGui.QGridLayout()
+        
+        # add the layout to the central widget
+        self.setLayout(layout)
+        
+        # plots
+        #######
+        self.crystal_path = '/forward_model_pdb/solid_unit'
+        self.diff_path = '/forward_model_pdb/data'
+        self.displayW = self.display(init=True)
+        
+        # config widget
+        ###############
+        self.config_widget = Write_config_file_widget(config_dict, self.config_filename)
+        
+        # run command widget
+        ####################
+        self.run_command_widget = Run_and_log_command()
+        self.run_command_widget.finished_signal.connect(lambda : self.display(init=False))
+        
+        # run command button
+        ####################
+        self.run_button = QtGui.QPushButton('Calculate forward model', self)
+        self.run_button.clicked.connect(self.run_button_clicked)
+        
+        # add a spacer for the labels and such
+        verticalSpacer = QtGui.QSpacerItem(20, 40, QtGui.QSizePolicy.Minimum, QtGui.QSizePolicy.Expanding)
+        
+        # set the layout
+        ################
+        layout.addWidget(self.displayW,            0, 1, 5, 1)
+        layout.addWidget(self.config_widget,       0, 0, 1, 1)
+        layout.addWidget(self.run_button,          1, 0, 1, 1)
+        #layout.addWidget(self.ref_button,          2, 0, 1, 1)
+        #layout.addWidget(self.set_button,          3, 0, 1, 1)
+        layout.addItem(verticalSpacer,             4, 0, 1, 1)
+        layout.addWidget(self.run_command_widget,  5, 0, 1, 2)
+        #layout.addWidget(self.run_ref_widget,      6, 0, 1, 2)
+        layout.setColumnStretch(1, 1)
+        layout.setColumnMinimumWidth(0, 250)
+        self.layout = layout
+
+    def run_button_clicked(self):
+        # write the config file 
+        #######################
+        self.config_widget.write_file()
+    
+        # Run the command 
+        #################
+        py = os.path.join(root, 'process/forward_model_pdb.py')
+        cmd = 'python ' + py + ' -f ' + self.filename + ' -c ' + self.config_filename
+        self.run_command_widget.run_cmd(cmd)
+    
+    def display(self, init=False):
+        self.f = h5py.File(self.filename, 'r')
+        print(self.crystal_path, init)
+        
+        if init :
+            # crystal
+            frame_plt = pg.PlotItem(title = 'real space crystal projections')
+            self.imageView = pg.ImageView(view = frame_plt)
+            self.imageView.ui.menuBtn.hide()
+            self.imageView.ui.roiBtn.hide()
+            
+            # diff
+            frame_plt2 = pg.PlotItem(title = 'diffraction volume slices')
+            self.imageView2 = pg.ImageView(view = frame_plt2)
+            self.imageView2.ui.menuBtn.hide()
+            self.imageView2.ui.roiBtn.hide()
+            
+            self.im_init = False
+    
+            splitter = QtGui.QSplitter(QtCore.Qt.Vertical)
+            splitter.addWidget(self.imageView)
+            splitter.addWidget(self.imageView2)
+        
+        if self.crystal_path in self.f :
+            print('making arrays...')
+
+            # real-space crystal view 
+            #########################
+            #cryst = self.f['/forward_model/solid_unit'][()].real
+            cryst = np.abs(self.f[self.crystal_path][()])
+            t = concatenate_projections(cryst, pad=10)
+            
+            # diffraction volume view 
+            #########################
+            #diff_h5 = self.f[self.diff_path]
+            
+            #diff = [np.fft.fftshift(diff_h5[0])[:, ::-1], np.fft.fftshift(diff_h5[:, 0, :])[:,::-1], np.fft.fftshift(diff_h5[:, :, 0])[:,::-1]]
+            #tt = (diff[0], padd, diff[1], padd, diff[2])
+            #tt = np.concatenate(tt, axis=0)**0.2
+             
+            if init is False :
+                print('updating image, init = False')
+                self.imageView.setImage(t, autoRange = False, autoLevels = False, autoHistogramRange = False)
+                #self.imageView2.setImage(tt, autoRange = False, autoLevels = False, autoHistogramRange = False)
+                self.im_init = True
+            
+            else :
+                print('updating image, init = True')
+                self.imageView.setImage(t)
+                #self.imageView2.setImage(tt)
+                self.im_init = True
+                    
+        self.f.close()
+
+        if init :
+            return splitter
+
 class Phase_widget(QtGui.QWidget):
     def __init__(self, filename):
         super(Phase_widget, self).__init__()
@@ -699,7 +845,7 @@ class Phase_widget(QtGui.QWidget):
             #cryst = np.fft.fftshift(cryst)
             # add 10 pix padding
             padd = np.zeros((10, cryst.shape[0]), dtype=cryst.real.dtype)
-            t = (np.sum(cryst,axis=0), padd, np.sum(cryst,axis=1), padd, np.sum(cryst,axis=2))
+            #t = (np.sum(cryst,axis=0), padd, np.sum(cryst,axis=1), padd, np.sum(cryst,axis=2))
             #cryst = reduce(np.multiply.outer, [np.ones((128,)), np.ones((128,)),np.arange(128)])
             t = (np.sum(cryst,axis=0), padd, np.sum(cryst,axis=1), padd, np.sum(cryst,axis=2))
             t = np.concatenate(t, axis=0)

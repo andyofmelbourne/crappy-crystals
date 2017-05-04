@@ -910,7 +910,7 @@ def make_lattice(u_pix, shape, N = None):
     shape = 3D shape of volume    e.g. (128, 64, 32)
     u_pix = 3D shape of unit cell e.g. (8, 16, 12)
     N     = number of unit cell's along each axis e.g. 100
-
+    
     if N is None then assume an infinite lattice
     """
     l          = np.zeros(shape, dtype=np.complex64)

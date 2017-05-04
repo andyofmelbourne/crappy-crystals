@@ -66,6 +66,11 @@ class Gui(QtGui.QTabWidget):
         self.tabs.append( widgets.Forward_model_widget(filename) )
         self.addTab(self.tabs[-1], "Forward model")
 
+        # Show forward model pdb tab
+        ########################
+        self.tabs.append( widgets.Forward_model_pdb_widget(filename) )
+        self.addTab(self.tabs[-1], "Forward model PDB")
+
         # Show phase tab
         ########################
         self.tabs.append( widgets.Phase_widget(filename) )
