@@ -115,7 +115,12 @@ def parse_parameters(config):
                         monitor_params[sect][op] = np.array(l, dtype=np.int)
                         continue
                     except :
-                        pass
+                        try :
+                            l = monitor_params[sect][op].split(',')
+                            monitor_params[sect][op] = np.array(l, dtype=np.float)
+                            continue
+                        except :
+                            pass
 
     return monitor_params
 

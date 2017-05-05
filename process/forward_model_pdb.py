@@ -1,4 +1,23 @@
 #!/usr/bin/env python
+"""
+Get the crystal info:
+    (phenix.fetch_pdb)
+    pdbid --> pdbid.pdb, pdbid-sf.cif 
+
+Generate the cut-map for the solid-unit:
+    (phenix.maps)
+    pdbid.pdb, pdbid-sf.cif --> pdbid-map.ccp4
+
+Cut out the solid-unit from the map using atomic coords
+from the pdb
+    (get_mol_density_ccp4_pdb)
+    cut-map --> cut_density
+
+Place in a bigger array correctly with respect to the origin.
+Then interpolate onto the desired grid.
+
+Then generate the forward map for the diffraction.
+"""
 
 # for python 2 / 3 compatibility
 from __future__ import absolute_import
@@ -153,7 +172,7 @@ def make_map_ccp4(pdbid):
     cif_fnam = os.path.abspath(os.path.join(dirnam, pdbid + '-sf.cif'))
     output   = os.path.abspath(os.path.join(dirnam, pdbid + '-map.ccp4'))
     maps_params = make_maps_params(pdb_fnam, cif_fnam, output)
-
+    
     # if the output file already exists then skip this stuff
     if os.path.exists(output):
         return output, pdb_fnam
@@ -207,31 +226,21 @@ def get_origin_voxel_unit(cdata):
     abc     = np.array([cdata['X'],cdata['Y'],cdata['Z']])
     return originp, originx, vox, abc
 
-def create_envelope(ccp4, atom_coords, radius, expand=True, return_density=False): 
-    """
-    Creates a mask using PDB-atomic coordinates convolved with a sphere (radius)
-    ccp4 : dictionary containing ccp4-header and map data \n
-    atom_coords : (3, N) array containing xyz coordinates of each atom \n
-    radius : cutoff radius for mask \n
-    expand (Boolean): If true, mask array size will be increased that it fits full envelope \n
-    return_density: If set true, will return masked map array in shape of mask
-    """
-    originp, originx, vox, abc = get_origin_voxel_unit(ccp4)
-     
+def create_envelope(data, atom_coords, originx, vox, radius, expand=True, return_density=True):
     # radius in pixels
     R         = np.array([radius/vox[0], radius/vox[1], radius/vox[2]])
-    if expand == True:
+    if expand == True :
         deltaShape = (np.ceil(R)*2).astype(np.int) + np.array([2,2,2])
-        newShape = np.asarray(ccp4['data'].shape) + deltaShape
-        mask = np.zeros( tuple(newShape),dtype=ccp4['data'].dtype )
-        originp = originp - deltaShape/2
-    else:
-        mask = np.zeros_like(ccp4['data'])
+        newShape   = np.asarray(data.shape) + deltaShape
+        mask       = np.zeros( tuple(newShape), dtype=data.dtype )
+        originx    = originx - vox * deltaShape/2
+    else :
+        mask = np.zeros_like(data)
     
     # atom_coords --> pixel coords in the density map (rounded to int)
-    ijk0 = np.rint([xyz / vox - originp for xyz in atom_coords.T]).astype(np.int)
+    ijk0 = np.rint([ (xyz - originx) / vox for xyz in atom_coords.T]).astype(np.int)
     
-    ijk = modulo_operation(ijk0.T,ccp4['data'].shape)
+    ijk = modulo_operation(ijk0.T, data.shape)
     
     # put a 1 at atomic positions
     mask[tuple(ijk)] = 1
@@ -242,24 +251,69 @@ def create_envelope(ccp4, atom_coords, radius, expand=True, return_density=False
     threshold = 1/(2*np.pi)**(3/2)/R[0]/R[1]/R[2]*np.exp(-3.0/2.0) 
     mask      = gaussian_filter(mask, R) > threshold
     
-    if return_density is True:
-        density = np.zeros(mask.shape, dtype=ccp4['data'].dtype)
+    if return_density is True :
+        density = np.zeros(mask.shape, dtype=data.dtype)
         density[deltaShape[0]//2 : -deltaShape[0]//2, \
                 deltaShape[1]//2 : -deltaShape[1]//2, \
-                deltaShape[2]//2 : -deltaShape[2]//2] = ccp4['data']
-        density *= mask
-        return mask, originp, density
+                deltaShape[2]//2 : -deltaShape[2]//2] = data
+        #density *= mask
+        return mask, originx, density
     else :
-        return mask, originp
+        return mask, originx 
 
-def get_mol_density_ccp4_pdb(ccp4_fnam, pdb_fnam, radius):
+def get_map_grid(ccp4, vox = None): 
+    from scipy.interpolate import RegularGridInterpolator
+    # get x, y, z coords for the data along each dimension
+    originp, originx, vox0, abc = get_origin_voxel_unit(ccp4)
+    
+    if vox is not None :
+        # make the new grid
+        shape = ccp4['data'].shape
+        
+        # just make three len 3 empty lists
+        X, X2, shape2 = [[None for i in range(3)] for j in range(3)]
+        for i in range(3):
+            # current grid along each axis
+            X[i]      = np.arange(shape[i]) * vox0[i] + originx[i]  
+            # the new shape with the new grid 
+            shape2[i] = int(round(shape[i] * vox0[i] / vox[i]))
+            # the new grid along each axis
+            X2[i]     = np.linspace(X[i][0], X[i][-1], shape2[i])
+        
+        shape2 = tuple(shape2) 
+        
+        # now interpolate onto the desired grid
+        interp = RegularGridInterpolator(tuple(X), ccp4['data'])
+        x,y,z  = np.meshgrid(X2[0], X2[1], X2[2], indexing='ij')
+        data2  = interp( np.array([x.ravel(), y.ravel(), z.ravel()]).T ).reshape(shape2)
+    else :
+        data2 = ccp4['data']
+        vox   = vox0
+    
+    geom = {}
+    geom['abc']     = abc
+    geom['originx'] = originx
+    geom['vox']     = np.array(vox)
+    return data2, geom
+
+
+def get_mol_density_ccp4_pdb(ccp4_fnam, pdb_fnam, radius, vox = None):
     # read the ccp4 file: a dictionary 
     ccp4 = ccp4_reader.read_ccp4(ccp4_fnam)
-    # get atomic coords: [[x0,y0,z0], [x1, y1, z1]...]
+    
+    # get the map on the desired grid
+    data, geom = get_map_grid(ccp4, vox)
+    
+    # read in the xyz coord for the atoms in the 
+    # rigid unit
     xyz = pdb_parser.coor(pdb_fnam)
-    mask, new_originp, cut_density = create_envelope(ccp4, xyz, radius, True, return_density=True)
-    originp, originx, vox, abc     = get_origin_voxel_unit(ccp4)
-    return cut_density, mask, vox, new_originp, abc
+    
+    # get the mask of the single rigid unit
+    mask, originx, data = create_envelope(data, xyz, geom['originx'], geom['vox'], radius, \
+                                          expand=True, return_density=True)
+    geom['originx'] = originx
+    return data, mask, geom
+
 
 def modulo_operation(ijk0,shape):
     '''
@@ -272,6 +326,25 @@ def modulo_operation(ijk0,shape):
     ijk = np.rint(np.array(ijk)).astype(np.int)
     return ijk.T
 
+def put_density_in_U(solid_unit, mask, shape, originp):
+    # let's get the array relative coordinates for each non-zero voxel
+    # ijk value for each non-zero element in cut_density
+    ijk_cut = np.where(mask>0.5)
+    
+    # ijk value relative to the unit-cell origin, for each non-zero element in cut_density
+    ijk_rel = tuple([np.rint(ijk_cut[i] + originp[i]).astype(np.int) for i in range(3)])
+    
+    # Now we have the un-broken rigid-unit in an array
+    U       = np.zeros(shape, dtype=solid_unit.dtype)
+    
+    # ijk value relative to 'big' origin, for each non-zero element in cut_density
+    ijk_U   = tuple([ijk_rel[i] % U.shape[i] for i in range(3)])
+    
+    # put the cut_density in the big array placed correctly w respect to the origin
+    U[ijk_U] = solid_unit[ijk_cut]
+    return U, ijk_rel
+
+
 if __name__ == '__main__':
     args, params = parse_cmdline_args()
     
@@ -283,35 +356,23 @@ if __name__ == '__main__':
         fnam = params['output_file']
     else :
         raise ValueError('output_file in the ini file is not valid, or the filename was not specified on the command line')
-
+    
     # make the map using phenix (generates a ccp4 file) 
     ccp4_fnam, pdb_fnam = make_map_ccp4(params['pdb_id'])
     
-    # get the solid_unit volume
-    cut_density, mask, vox, new_originp, abc = get_mol_density_ccp4_pdb(ccp4_fnam, pdb_fnam, params['cut_radius_ang'])
+    # get the solid_unit volume on the desired grid
+    density, mask, geom = get_mol_density_ccp4_pdb(ccp4_fnam, pdb_fnam, params['cut_radius_ang'], params['pixel_size_ang'])
 
-    # let's get the array relative coordinates for each non-zero voxel
-    # ijk value for each non-zero element in cut_density
-    ijk_cut = np.where(mask>0.5)
-    
-    # ijk value relative to the unit-cell origin, for each non-zero element in cut_density
-    ijk_rel = tuple([np.rint(ijk_cut[i] + new_originp[i]).astype(np.int) for i in range(3)])
+    # now put the single rigid unit in the unit-cell
+    solid_unit, ijk_rel = put_density_in_U(density*mask, mask, params['shape'], geom['originx']/geom['vox'])
+    """
 
-    # Now we have the un-broken rigid-unit in an array
-    # Let's make an array big enough for 2x2x2 solid_units
-    big     = np.zeros(tuple(2*np.array(cut_density.shape)), dtype=cut_density.dtype)
-    
-    # ijk value relative to 'big' origin, for each non-zero element in cut_density
-    ijk_big = tuple([ijk_rel[i] % big.shape[i] for i in range(3)])
-
-    # put the cut_density in the big array placed correctly w respect to the origin
-    big[ijk_big] = cut_density[ijk_cut]
     
     # then interpolate in fourier space to get the right grid
-    big = np.fft.fftn(big)
-
+    #big = np.fft.fftn(big)
+    
     # we want cubic voxels (so stretch short axes)
-    pass
+
 
     # we want an even multiple of unit cells (so cut / zero padd)
     pass
@@ -347,3 +408,4 @@ if __name__ == '__main__':
         shutil.copy(args.config, outputdir)
     except Exception as e :
         print(e)
+    """
