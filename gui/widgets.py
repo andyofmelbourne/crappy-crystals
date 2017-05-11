@@ -30,6 +30,8 @@ import argparse
 import os, sys
 import copy
 
+from collections import OrderedDict
+
 # import python modules using the relative directory 
 # locations this way the repository can be anywhere 
 root = os.path.split(os.path.abspath(__file__))[0]
@@ -94,6 +96,31 @@ def concatenate_projections(volume, pad=10):
             c += [t.copy()]
 
     print([j.shape for j in c])
+    return np.concatenate(tuple(c), axis=0)
+
+def concatenate_slices(volume, pad=10, fftshifted=True):
+    """
+    concatenate 3 slices of a density along each axis
+    for easy viewing in 2D
+    """
+    N = max(volume.shape[1:])
+    padd = np.zeros((10, N), dtype=volume.dtype)
+
+    if not fftshifted :
+        volume = np.fft.ifftshift(volume)
+    
+    c = []
+    for i in range(len(volume.shape)):
+        # grab a slice like volume[:, 0, :]
+        s = [slice(None) if j != i else 0 for j in range(len(volume.shape))]
+        p = volume[s]
+        t = np.zeros((p.shape[0], N), dtype=volume.dtype)
+        t[:, :p.shape[1]] = p
+        if i < (len(volume.shape) - 1) :
+            c += [np.fft.fftshift(t.copy()), padd.copy()]
+        else :
+            c += [np.fft.fftshift(t.copy())]
+    
     return np.concatenate(tuple(c), axis=0)
 
 class Show_h5_list_widget(QtGui.QWidget):
@@ -441,7 +468,7 @@ class Write_config_file_widget(QtGui.QWidget):
         i += 1
         
         # we have 
-        self.labels_lineedits = {}
+        self.labels_lineedits = OrderedDict()
         group_labels = []
         for group in config_dict.keys():
             # add a label for the group
@@ -451,10 +478,10 @@ class Write_config_file_widget(QtGui.QWidget):
             layout.addWidget(group_labels[-1], i, 0, 1, 2)
             i += 1
             
-            self.labels_lineedits[group] = {}
+            self.labels_lineedits[group] = OrderedDict()
             # add the labels and line edits
             for key in config_dict[group].keys():
-                self.labels_lineedits[group][key] = {}
+                self.labels_lineedits[group][key] = OrderedDict()
                 self.labels_lineedits[group][key]['label'] = QtGui.QLabel(self)
                 self.labels_lineedits[group][key]['label'].setText(key)
                 layout.addWidget(self.labels_lineedits[group][key]['label'], i, 0, 1, 1)
@@ -711,31 +738,28 @@ class Forward_model_pdb_widget(QtGui.QWidget):
         
         if self.crystal_path in self.f :
             print('making arrays...')
-
+            
             # real-space crystal view 
             #########################
             #cryst = self.f['/forward_model/solid_unit'][()].real
-            cryst = np.abs(self.f[self.crystal_path][()])
-            t = concatenate_projections(cryst, pad=10)
+            cryst = np.real(self.f[self.crystal_path][()])
+            t = concatenate_projections(np.fft.fftshift(cryst), pad=10)
             
             # diffraction volume view 
             #########################
-            #diff_h5 = self.f[self.diff_path]
-            
-            #diff = [np.fft.fftshift(diff_h5[0])[:, ::-1], np.fft.fftshift(diff_h5[:, 0, :])[:,::-1], np.fft.fftshift(diff_h5[:, :, 0])[:,::-1]]
-            #tt = (diff[0], padd, diff[1], padd, diff[2])
-            #tt = np.concatenate(tt, axis=0)**0.2
+            diff_h5 = self.f[self.diff_path][()]
+            tt = concatenate_slices(diff_h5, pad=10, fftshifted=True)**0.2
              
             if init is False :
                 print('updating image, init = False')
                 self.imageView.setImage(t, autoRange = False, autoLevels = False, autoHistogramRange = False)
-                #self.imageView2.setImage(tt, autoRange = False, autoLevels = False, autoHistogramRange = False)
+                self.imageView2.setImage(tt, autoRange = False, autoLevels = False, autoHistogramRange = False)
                 self.im_init = True
             
             else :
                 print('updating image, init = True')
                 self.imageView.setImage(t)
-                #self.imageView2.setImage(tt)
+                self.imageView2.setImage(tt)
                 self.im_init = True
                     
         self.f.close()
@@ -766,7 +790,8 @@ class Phase_widget(QtGui.QWidget):
         
         # plots
         #######
-        self.crystal_path = '/phase/crystal'
+        #self.crystal_path = '/phase/crystal'
+        self.crystal_path = '/phase/solid_unit'
         self.diff_path    = '/phase/diff'
         self.displayW     = self.display(init=True)
         
@@ -841,22 +866,25 @@ class Phase_widget(QtGui.QWidget):
             # real-space crystal view 
             #########################
             #cryst = self.f['/forward_model/solid_unit'][()].real
-            cryst = np.abs(self.f[self.crystal_path][()])
+            #cryst = self.f[self.crystal_path][()]
             #cryst = np.fft.fftshift(cryst)
             # add 10 pix padding
-            padd = np.zeros((10, cryst.shape[0]), dtype=cryst.real.dtype)
+            #padd = np.zeros((10, cryst.shape[0]), dtype=cryst.real.dtype)
             #t = (np.sum(cryst,axis=0), padd, np.sum(cryst,axis=1), padd, np.sum(cryst,axis=2))
             #cryst = reduce(np.multiply.outer, [np.ones((128,)), np.ones((128,)),np.arange(128)])
-            t = (np.sum(cryst,axis=0), padd, np.sum(cryst,axis=1), padd, np.sum(cryst,axis=2))
-            t = np.concatenate(t, axis=0)
+            #t = (np.sum(cryst,axis=0), padd, np.sum(cryst,axis=1), padd, np.sum(cryst,axis=2))
+            #t = np.concatenate(t, axis=0)
+            cryst = np.real(self.f[self.crystal_path][()])
+            t = concatenate_projections(np.fft.fftshift(cryst), pad=10)
             
             # diffraction volume view 
             #########################
-            diff_h5 = self.f[self.diff_path]
-            
-            diff = [np.fft.fftshift(diff_h5[0])[:, ::-1], np.fft.fftshift(diff_h5[:, 0, :])[:,::-1], np.fft.fftshift(diff_h5[:, :, 0])[:,::-1]]
-            tt = (diff[0], padd, diff[1], padd, diff[2])
-            tt = np.concatenate(tt, axis=0)**0.2
+            #diff_h5 = self.f[self.diff_path]
+            #diff = [np.fft.fftshift(diff_h5[0])[:, ::-1], np.fft.fftshift(diff_h5[:, 0, :])[:,::-1], np.fft.fftshift(diff_h5[:, :, 0])[:,::-1]]
+            #tt = (diff[0], padd, diff[1], padd, diff[2])
+            #tt = np.concatenate(tt, axis=0)**0.2
+            diff_h5 = self.f[self.diff_path][()]
+            tt = concatenate_slices(diff_h5, pad=10, fftshifted=True)**0.2
              
             if init is False :
                 print('updating image, init = False')

@@ -232,15 +232,16 @@ def create_envelope(data, atom_coords, originx, vox, radius, expand=True, return
     if expand == True :
         deltaShape = (np.ceil(R)*2).astype(np.int) + np.array([2,2,2])
         newShape   = np.asarray(data.shape) + deltaShape
-        mask       = np.zeros( tuple(newShape), dtype=data.dtype )
         originx    = originx - vox * deltaShape/2
     else :
-        mask = np.zeros_like(data)
+        newShape = data.shape
+    
+    mask       = np.zeros( tuple(newShape), dtype=data.dtype )
     
     # atom_coords --> pixel coords in the density map (rounded to int)
     ijk0 = np.rint([ (xyz - originx) / vox for xyz in atom_coords.T]).astype(np.int)
     
-    ijk = modulo_operation(ijk0.T, data.shape)
+    ijk = modulo_operation(ijk0.T, newShape)
     
     # put a 1 at atomic positions
     mask[tuple(ijk)] = 1
@@ -365,19 +366,22 @@ if __name__ == '__main__':
 
     # now put the single rigid unit in the unit-cell
     solid_unit, ijk_rel = put_density_in_U(density*mask, mask, params['shape'], geom['originx']/geom['vox'])
-    """
 
+    # make the input
+    ################
+    unit_cell  = geom['abc'] / geom['vox']
+    N          = params['n']
+    sigma      = params['sigma']
+    del params['n']
+    del params['sigma']
     
-    # then interpolate in fourier space to get the right grid
-    #big = np.fft.fftn(big)
-    
-    # we want cubic voxels (so stretch short axes)
+    # calculate the diffraction data and metadata
+    #############################################
+    diff, info = forward_sim.generate_diff(solid_unit, unit_cell, N, sigma, **params)
 
-
-    # we want an even multiple of unit cells (so cut / zero padd)
-    pass
-
-    solid_unit = big
+    info['unit_cell_pixels'] = unit_cell
+    info['unit_cell_ang']    = geom['abc']
+    info['density_cut']      = mask * density
     
     # output
     ########
@@ -399,6 +403,28 @@ if __name__ == '__main__':
         del f[key]
     f[key] = solid_unit
     
+    # diffraction data
+    key = group+'/data'
+    if key in f :
+        del f[key]
+    f[key] = diff
+
+    # everything else
+    for key, value in info.items():
+        if value is None :
+            continue 
+        
+        h5_key = group+'/'+key
+        if h5_key in f :
+            del f[h5_key]
+        
+        try :
+            print('writing:', h5_key, type(value))
+            f[h5_key] = value
+        
+        except Exception as e :
+            print('could not write:', h5_key, ':', e)
+
     f.close() 
     
     # copy the config file
@@ -408,4 +434,3 @@ if __name__ == '__main__':
         shutil.copy(args.config, outputdir)
     except Exception as e :
         print(e)
-    """

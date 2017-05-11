@@ -121,7 +121,7 @@ if __name__ == '__main__':
     # output
     ########
     outputdir = os.path.split(os.path.abspath(args.filename))[0]
-
+    
     # mkdir if it does not exist
     if not os.path.exists(outputdir):
         os.makedirs(outputdir)

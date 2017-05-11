@@ -26,7 +26,7 @@ import re
 # locations this way the repository can be anywhere 
 root = os.path.split(os.path.abspath(__file__))[0]
 root = os.path.split(root)[0]
-sys.path.append(os.path.join(root, 'utils'))
+sys.path = [os.path.join(root, 'utils')] + sys.path
 
 import io_utils
 import duck_3D
@@ -144,19 +144,23 @@ if __name__ == '__main__':
     else :
         f = h5py.File(params['input_file'])
 
+    # data
     I = f[params['data']][()]
     
+    # solid unit
     if params['solid_unit'] is None :
         solid_unit = None
     else :
         print('loading solid_unit from file...')
         solid_unit = f[params['solid_unit']][()]
     
+    # detector mask
     if params['mask'] is None :
         mask = None
     else :
         mask = f[params['mask']][()]
     
+    # voxel support
     if params['voxels'] is None :
         voxels = None
     elif type(params['voxels']) != int and params['voxels'][0] == '/'  :
@@ -164,20 +168,30 @@ if __name__ == '__main__':
     else :
         voxels = params['voxels']
     
+    # fixed support
     if params['support'] is None or params['support'] is False :
         support = None
     else :
         support = f[params['support']][()]
         
+    # Bragg weighting
     if params['bragg_weighting'] is None or params['bragg_weighting'] is False :
         bragg_weighting = None
     else :
         bragg_weighting = f[params['bragg_weighting']][()]
 
+    # Diffuse weighting
     if params['diffuse_weighting'] is None or params['diffuse_weighting'] is False :
         diffuse_weighting = None
     else :
         diffuse_weighting = f[params['diffuse_weighting']][()]
+
+    # Unit cell parameters
+    if type(params['unit_cell']) != int and params['unit_cell'][0] == '/'  :
+        unit_cell = f[params['unit_cell']][()]
+    else :
+        unit_cell = params['unit_cell']
+
 
     # make the mapper
     #################
@@ -188,7 +202,7 @@ if __name__ == '__main__':
                                  voxels            = voxels,
                                  overlap           = params['overlap'],
                                  support           = support,
-                                 unit_cell         = params['unit_cell'],
+                                 unit_cell         = unit_cell,
                                  space_group       = params['space_group'],
                                  alpha             = params['alpha'],
                                  dtype             = params['dtype']

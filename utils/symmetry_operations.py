@@ -120,7 +120,7 @@ class P212121():
         
         self.Pat_sym_ops   = 8
         self.unitcell_size = unitcell_size
-        self.Cheshire_cell = (unitcell_size[0]//2, unitcell_size[1]//2,unitcell_size[2]//2)
+        self.Cheshire_cell = tuple(np.rint(self.unitcell_size/2.).astype(np.int) + 1)
         self.det_shape     = det_shape
         
         # keep an array for the 4 symmetry related coppies of the solid unit
@@ -278,9 +278,10 @@ class P212121():
         solid unit that fit within the field-of-view (not just the unit-cell
         as in solid_syms_real).
         """
+        unitcell_size_int = np.rint(self.unitcell_size).astype(np.int)
         # calculate the number of times that we need to tile the unit-cell 
         # unit so that we fill the field-of-view
-        tiles = np.ceil(2*np.array(solid.shape, dtype=np.float) / np.array(self.unitcell_size, dtype=np.float) - 1.0).astype(np.int)
+        tiles = np.ceil(2*np.array(solid.shape, dtype=np.float) / np.array(unitcell_size_int, dtype=np.float) - 1.0).astype(np.int)
         
         # get the symmetry related coppies of solid in the unit-cell
         # hopefully these fit in the field-of-view...
@@ -301,7 +302,7 @@ class P212121():
                     if i == 0 and j == 0 and k == 0 :
                         continue
                     
-                    shift = np.array([i, j, k]) * np.array(self.unitcell_size)
+                    shift = np.array([i, j, k]) * np.array(unitcell_size_int)
                     
                     #print(i,j,k, shift, U.shape)
                     #print(i,j,k, shift, index)
@@ -903,6 +904,55 @@ def lattice_old_new(unit_cell_size, shape):
     
     return lattice
 
+def make_lattice_subsample(u_pix, shape, N = None, subsamples=50):
+    """
+    make a finite lattice function in q-space
+    shape = 3D shape of volume    e.g. (128, 64, 32)
+    u_pix = 3D shape of unit cell e.g. (8, 16, 12)
+    N     = number of unit cell's along each axis e.g. 100
+    
+    if N is None then assume an infinite lattice
+    """
+    # make the q-values along each axis
+    shape2 = tuple(np.array(shape)*subsamples)
+    #l          = np.zeros(shape, dtype=np.complex64)
+    q0         = np.fft.fftfreq(shape2[0]).astype(np.float32)
+    q1         = np.fft.fftfreq(shape2[1]).astype(np.float32)
+    q2         = np.fft.fftfreq(shape2[2]).astype(np.float32)
+    
+    # make the lattice functions along each axis
+    l0 = np.zeros(shape2[0], dtype=np.complex64)
+    l1 = np.zeros(shape2[1], dtype=np.complex64)
+    l2 = np.zeros(shape2[2], dtype=np.complex64)
+
+    # define the number of lattice points along each axis
+    if N is None :
+        N = 1000
+        infinite = True
+    else :
+        infinite = False
+    
+    # add the plane waves along each axis
+    for k in range(1, N):
+        a   = k * np.array(u_pix)
+        l0 += np.exp(2.0J * np.pi * a[0] * q0)
+        l1 += np.exp(2.0J * np.pi * a[1] * q1)
+        l2 += np.exp(2.0J * np.pi * a[2] * q2)
+    
+    # down-sample the intensities to prevent aliasing
+    l0 = (l0 * l0.conj()).real.reshape( (shape[0], subsamples) )
+    l1 = (l1 * l1.conj()).real.reshape( (shape[1], subsamples) )
+    l2 = (l2 * l2.conj()).real.reshape( (shape[2], subsamples) )
+    l0 = np.sum(l0, axis=-1)
+    l1 = np.sum(l1, axis=-1)
+    l2 = np.sum(l2, axis=-1)
+    
+    l = np.multiply.outer(l0, l1)
+    l = np.multiply.outer(l, l2) / float(subsamples**3)
+    if infinite :
+        l = (l > 0.5 * l.max()).astype(np.float32)
+
+    return l 
 
 def make_lattice(u_pix, shape, N = None):
     """

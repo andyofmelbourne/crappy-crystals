@@ -83,10 +83,11 @@ def parse_parameters(config):
       The first choice that succeeds determines the entry type
     """
 
-    monitor_params = {}
+    from collections import OrderedDict
+    monitor_params = OrderedDict()
 
     for sect in config.sections():
-        monitor_params[sect]={}
+        monitor_params[sect]=OrderedDict()
         for op in config.options(sect):
             monitor_params[sect][op] = config.get(sect, op)
             if monitor_params[sect][op].startswith("'") and monitor_params[sect][op].endswith("'"):

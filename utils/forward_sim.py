@@ -175,7 +175,7 @@ def generate_diff(solid_unit, unit_cell, N, sigma, **params):
     # define the solid_unit support
     ###############################
     if io_utils.isValid('support_frac', params):
-        support = padding.expand_region_by(solid_unit > 0., params['support_frac'])
+        support = padding.expand_region_by(np.abs(solid_unit) > 0., params['support_frac'])
     else :
         support = np.abs(solid_unit) > 0.
     
@@ -196,13 +196,17 @@ def generate_diff(solid_unit, unit_cell, N, sigma, **params):
     
     # make the lattice
     ##################
-    lattice = symmetry_operations.make_lattice(unit_cell, solid_unit.shape, N)
+    lattice = symmetry_operations.make_lattice_subsample(unit_cell, solid_unit.shape, N)
     # normalise by the number of unit cells
     lattice = lattice / N**3
+    
     if io_utils.isValid('lattice_blur', params) :
         import scipy.ndimage
         lattice = scipy.ndimage.filters.gaussian_filter(lattice, params['lattice_blur'], truncate=10.)
         print('Bluring the lattice function...', lattice.dtype)
+    
+    # normalise the lattice by its max value
+    #lattice = lattice / lattice.max()
     
     Bw      = exp * lattice 
     Dw      = (1. - exp) 
@@ -295,7 +299,7 @@ def generate_diff(solid_unit, unit_cell, N, sigma, **params):
     crystal_ar, unit_cell_ar = sym_ops.solid_to_crystal_real(solid_unit, return_unit=True)
     
     # no. of voxels and solvent content
-    voxels           = np.sum(solid_unit > 0.)
+    voxels           = np.sum(np.abs(solid_unit) > 0.)
     voxels_sup       = np.sum(support > 0.)
     voxels_unit_cell = np.prod(unit_cell)
     solvent_sample   = 1. - sym_ops.no_solid_units * voxels     / float(voxels_unit_cell)

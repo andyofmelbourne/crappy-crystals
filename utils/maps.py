@@ -264,7 +264,7 @@ class Mapper_ellipse():
         
         # broadcast
         out = self.sym_ops.solid_syms_Fourier(out_solid, apply_translation=True,  syms=out)
-
+        
         self.iters += 1
         
         return out
