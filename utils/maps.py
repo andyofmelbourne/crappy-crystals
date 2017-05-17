@@ -249,7 +249,7 @@ class Mapper_ellipse():
                 intensity = (out_solid * out_solid.conj()).real.astype(np.float32)
                 self.voxel_support = choose_N_highest_pixels( intensity, self.voxel_number, \
                                      support = self.support, mapper = self.sym_ops.solid_syms_real)
-                self.voxel_support = voxel_number_support_single_connected_region(intensity, self.voxel_number, init_sup=self.voxel_support)
+                #self.voxel_support = voxel_number_support_single_connected_region(intensity, self.voxel_number, init_sup=self.voxel_support)
             
             elif self.overlap == 'crystal' :
                 # try using the crystal mapping instead of the unit-cell mapping
@@ -373,6 +373,8 @@ class Mapper_ellipse():
         # symmetrise it so that we have all pairs in the point group
         Bragg_mask = self.sym_ops.solid_syms_Fourier(Bragg_mask, apply_translation=False)
         Bragg_mask = np.sum(Bragg_mask, axis=0)>0
+
+        print('using', np.sum(Bragg_mask), 'Bragg peaks for the Cheshire scan')
         
         # propagate
         s  = np.fft.fftn(solid)
@@ -441,6 +443,11 @@ class Mapper_ellipse():
         T2 = np.exp(- 2J * np.pi * K[k] * qk)
         phase_ramp = reduce(np.multiply.outer, [T0, T1, T2])
         s1         = s * phase_ramp
+        
+        # shift the support
+        s = self.voxel_support.astype(np.complex128)
+        s = np.fft.fftn(s) * phase_ramp
+        self.voxel_support = np.abs(np.fft.ifftn(s))>0.5
         
         # broadcast
         modes = self.sym_ops.solid_syms_Fourier(s1, apply_translation=True)
