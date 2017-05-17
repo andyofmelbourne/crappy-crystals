@@ -95,6 +95,9 @@ def phase(mapper, iters_str = '100DM 100ERA', beta=1):
     if Cheshire_error_map is not None :
         info['Cheshire_error_map'] = Cheshire_error_map
     
+    # temp
+    modes = mapper.Pmod(mapper.modes)
+    O = mapper.object(modes)
     return O, mapper, eMod, eCon, info
 
 def parse_cmdline_args(default_config='phase.ini'):
@@ -168,6 +171,14 @@ if __name__ == '__main__':
     else :
         voxels = params['voxels']
     
+    # support update frequency
+    if params['support_update_freq'] is None :
+        support_update_freq = None
+    elif type(params['support_update_freq']) != int and params['support_update_freq'][0] == '/'  :
+        support_update_freq = f[params['support_update_freq']][()]
+    else :
+        support_update_freq = params['support_update_freq']
+
     # fixed support
     if params['support'] is None or params['support'] is False :
         support = None
@@ -191,8 +202,8 @@ if __name__ == '__main__':
         unit_cell = f[params['unit_cell']][()]
     else :
         unit_cell = params['unit_cell']
-
-
+    
+    
     # make the mapper
     #################
     mapper = maps.Mapper_ellipse(f[params['data']][()], 
@@ -202,6 +213,7 @@ if __name__ == '__main__':
                                  voxels            = voxels,
                                  overlap           = params['overlap'],
                                  support           = support,
+                                 support_update_freq = support_update_freq,
                                  unit_cell         = unit_cell,
                                  space_group       = params['space_group'],
                                  alpha             = params['alpha'],
@@ -212,7 +224,7 @@ if __name__ == '__main__':
     # phase
     #######
     O, mapper, eMod, eCon, info = phase(mapper, params['iters'], params['beta'])
-
+    
     # calculate the fidelity if we have the ground truth
     ####################################################
     if params['input_file'] is None :

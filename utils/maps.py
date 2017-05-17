@@ -174,6 +174,11 @@ class Mapper_ellipse():
         else :
             self.support = 1
         
+        if isValid('support_update_freq', args) :
+            self.support_update_freq = args['support_update_freq']
+        else :
+            self.support_update_freq = 1
+        
         if isValid('voxels', args) :
             self.voxel_number  = args['voxels']
             self.voxel_support = np.ones(O.shape, dtype=np.bool)
@@ -211,7 +216,6 @@ class Mapper_ellipse():
         self.iters = 0
         
         print('eMod(modes0):', self.Emod(self.modes))
-
          
     def object(self, modes):
         out = np.fft.ifftn(modes[0])
@@ -239,11 +243,14 @@ class Mapper_ellipse():
         out_solid.imag = 0
         
         # finite support
-        if self.voxel_number :
+        if self.voxel_number and (self.iters % self.support_update_freq == 0) :
             #print('\n\nVoxel number support')
             if self.overlap == 'unit_cell' :
-                self.voxel_support = choose_N_highest_pixels( (out_solid * out_solid.conj()).real.astype(np.float32), self.voxel_number, \
+                intensity = (out_solid * out_solid.conj()).real.astype(np.float32)
+                self.voxel_support = choose_N_highest_pixels( intensity, self.voxel_number, \
                                      support = self.support, mapper = self.sym_ops.solid_syms_real)
+                self.voxel_support = voxel_number_support_single_connected_region(intensity, self.voxel_number, init_sup=self.voxel_support)
+            
             elif self.overlap == 'crystal' :
                 # try using the crystal mapping instead of the unit-cell mapping
                 self.voxel_support = choose_N_highest_pixels( (out_solid * out_solid.conj()).real.astype(np.float32), self.voxel_number, \
@@ -521,3 +528,174 @@ def choose_N_highest_pixels(array, N, tol = 1.0e-10, maxIters=1000, mapper = Non
     
     #print('number of pixels in support:', np.sum(S), i, s, e)
     return S
+
+def voxel_number_support_single_connected_region(intensity, N, init_sup=None, downsample=None, i_max=1000):
+    if downsample is not None :
+        intensity2 = downsample_array(intensity, downsample)
+        sup        = voxel_number_support_single_connected_region(intensity2, int(N/float(downsample**len(intensity.shape))))
+        init_sup   = upsample_array(sup, downsample)
+    
+    if init_sup is None :
+        # blur then threshold
+        sup = find_sigma_thresh(intensity, N=N, sigma=1.0, tol = 100)
+        
+    else :
+        sup = init_sup.copy()
+    
+    from scipy import spatial, ndimage 
+    # label the regions and select the one with the largest intensity
+    labeled, num_labels = ndimage.measurements.label(sup)
+    
+    intensities = [np.sum(intensity[labeled==i]) for i in range(1, num_labels+1)]
+    sup.fill(False) 
+    sup[labeled==(np.argmax(intensities)+1)] = True
+
+    struct = ndimage.generate_binary_structure(len(intensity.shape), 1)
+    for i in range(i_max):
+        changed = False
+        
+        # if we have too many voxels then discard inner shell voxels
+        N_sup = np.sum(sup)
+        if N_sup > N :
+            # raveled indices
+            inside         = get_inside_edge_indices(sup)
+            inside_sorted  = inside[np.argsort( intensity.ravel()[inside] )]
+             
+            #print('removing', N_sup-N, 'inner shell voxels from the support')
+            if (N_sup - N) >= len(inside_sorted):
+                sup.ravel()[inside_sorted] = False
+            else :
+                sup.ravel()[inside_sorted[N_sup - N]] = False
+            changed = True
+        
+        # if we have too few voxels then add to the outer shell
+        elif N_sup < N :
+            # raveled indices
+            outside        = get_outside_edge_indices(sup)
+            outside_sorted = outside[np.argsort( intensity.ravel()[outside] )]
+            
+            #print('adding', N-N_sup, 'outer shell voxels to the support')
+            if (N - N_sup) >= len(outside_sorted):
+                sup.ravel()[outside_sorted] = True
+            else :
+                sup.ravel()[outside_sorted[N - N_sup]] = True
+            changed = True
+
+        # if we have exactly the right number of voxels
+        # then replace inner shell voxels with outer shell voxels
+        else :
+            # raveled indices
+            inside         = get_inside_edge_indices(sup)
+            inside_sorted  = inside[np.argsort( intensity.ravel()[inside] )]
+            temp_sup       = sup.copy()
+            
+            # loop over coords from smallest to largest
+            # get the most intense outside voxel 
+            # and swap the supports 
+            for j in inside_sorted :
+                # mask the weakest the voxel
+                temp_sup.ravel()[j] = False
+                
+                # now get the outer shell 
+                outside = get_outside_edge_indices(temp_sup)
+                
+                # find the index of the most intense value
+                k = outside[np.argmax(intensity.ravel()[outside])]
+                
+                # unmask that voxel if it is greater
+                if intensity.ravel()[k] > intensity.ravel()[j]:
+                    #print('swapping indices:', j, '<-->', k, 'in support')
+                    changed = True
+                    temp_sup.ravel()[k] = True
+                else :
+                    # we are done with this inner shell
+                    #print('done with inner shell:', i)
+                    temp_sup.ravel()[j] = True
+                    break
+            
+            sup = temp_sup.copy()
+        
+        if changed is False :
+            break
+    return sup
+
+def downsample_array(array, N):
+    out = array.copy()
+    for i in range(len(array.shape)):
+        # transpose 'out' so that the shrunk dimension is last
+        out = np.swapaxes(out, i, -1)
+        # reshape and sum the last axis
+        newshape = tuple(list(out.shape[:-1]) + [out.shape[-1]//N, N])
+        out      = np.sum(out.reshape( newshape ), axis=-1)
+        # transpose back to original dims
+        out = np.swapaxes(out, i, -1)
+    return out
+
+def upsample_array(array, N):
+    out = array.copy()
+    for i in range(len(array.shape)):
+        # transpose 'out' so that the shrunk dimension is first
+        out = np.swapaxes(out, i, 0)
+        out = np.array([out for i in range(N)]).T
+        newshape      = list(out.shape[:-1])
+        newshape[-1] *= N
+        out           = out.reshape( newshape ).T 
+        # transpose back to original dims
+        out = np.swapaxes(out, i, 0)
+    return out
+
+def get_outside_edge_indices(binary_mask, **kwargs):
+    #from scipy.ndimage.morphology import binary_dilation
+    from scipy import ndimage
+    struct = ndimage.generate_binary_structure(len(binary_mask.shape), 1)
+    
+    # dilate the binary mask 
+    #b2 = binary_dilation(binary_mask, structure=struct)
+    b2 = ndimage.morphology.grey_dilation(binary_mask, footprint=struct, mode='wrap').astype(np.bool)
+
+    # get the indices of the difference
+    i = np.where(np.bitwise_xor(binary_mask, b2).ravel())[0]
+    return i
+
+def get_inside_edge_indices(binary_mask, **kwargs):
+    #from scipy.ndimage.morphology import binary_erosion
+    #from scipy.ndimage.morphology import grey_erosion
+    from scipy import ndimage
+    struct = ndimage.generate_binary_structure(len(binary_mask.shape), 1)
+    
+    # dilate the binary mask 
+    #b2 = binary_erosion(binary_mask, structure=struct)
+    b2 = ndimage.morphology.grey_erosion(binary_mask, footprint=struct, mode='wrap').astype(np.bool)
+
+    # get the indices of the difference
+    i = np.where(np.bitwise_xor(binary_mask, b2).ravel())[0]
+    return i
+
+def find_sigma_thresh(array, N=32445, tol=10, sigma=2., maxIters=100):
+    from scipy.ndimage.filters import gaussian_filter
+    
+    support    = np.zeros(array.shape, dtype=np.bool)
+    array_blur = gaussian_filter(array, sigma, mode='wrap')
+    array_blur_max = array_blur.max()
+    
+    s1 = 0.
+    s0 = array_blur_max 
+    
+    for i in range(maxIters):
+        s = (s0 + s1) / 2.
+        
+        threshold = s * array_blur_max
+        
+        support = array_blur > threshold
+        e = np.sum(support) - N
+          
+        if np.abs(e) <= tol :
+            #print('e==0, exiting...')
+            break
+        
+        if e < 0 :
+            s0 = s
+        else :
+            s1 = s
+    
+    return support
