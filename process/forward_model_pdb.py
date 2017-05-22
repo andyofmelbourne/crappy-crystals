@@ -268,8 +268,11 @@ def get_map_grid(ccp4, vox = None):
     originp, originx, vox0, abc = get_origin_voxel_unit(ccp4)
     
     if vox is not None :
+        # First Fourier padd / cut to get approximately the correct grid
+        data, vox0 = Fourier_padd_truncate(ccp4['data'], vox0, vox)
+        
         # make the new grid
-        shape = ccp4['data'].shape
+        shape = data.shape
         
         # just make three len 3 empty lists
         X, X2, shape2 = [[None for i in range(3)] for j in range(3)]
@@ -283,8 +286,8 @@ def get_map_grid(ccp4, vox = None):
         
         shape2 = tuple(shape2) 
         
-        # now interpolate onto the desired grid
-        interp = RegularGridInterpolator(tuple(X), ccp4['data'])
+        # now interpolate onto the desired grid (minor adjustment)
+        interp = RegularGridInterpolator(tuple(X), data)
         x,y,z  = np.meshgrid(X2[0], X2[1], X2[2], indexing='ij')
         data2  = interp( np.array([x.ravel(), y.ravel(), z.ravel()]).T ).reshape(shape2)
     else :
@@ -296,6 +299,78 @@ def get_map_grid(ccp4, vox = None):
     geom['originx'] = originx
     geom['vox']     = np.array(vox)
     return data2, geom
+
+def Fourier_padd_truncate(data, voxOld, voxNew):
+    """
+    Fourier padd or cut to get the real-space grid approximately at voxNew.
+
+    zero padd data to avoid alliasing: 2N, dx
+    dq = 1/(2Nold dxold), Q = 1/dxold
+    
+    Now truncate Q: Qnew = 1/dxnew = Nnew dq = Nnew / (2Nold dxold) 
+                    Nnew = 2Nold dxold / dxnew
+                    voxNew2 = 1 / (dq * Nnew) = 2Nold dxold / Nnew
+
+    Normalisation: mean(data) = Data[0] / Nold
+    Normalisation: mean(out)  = Out[0]  / 2 Nnew
+    """
+    # zero padd data to prevent aliasing
+    out = np.zeros(tuple(2*np.array(data.shape)), dtype=data.dtype)
+    
+    slices = [slice(data.shape[i]) for i in range(len(data.shape))]
+    out[slices] = data
+    
+    # Fourier transform
+    out  = np.fft.fftn(out)
+    Nnew = np.rint(np.array(out.shape) * voxOld / voxNew).astype(np.int)
+
+    for i in range(len(out.shape)):
+        out = zero_padd_truncate_fftshifted(out, Nnew[i], i)
+    
+    out = np.fft.ifftn(out)
+    
+    for i in range(len(out.shape)):
+        out = out[:out.shape[i]//2]
+    
+    # normalise to keep the same mean value in real space
+    out *= out.size / float(data.size)
+    
+    # calculate the new sampling
+    voxNew2 = 2*np.array(data.shape) * voxOld / Nnew
+    return out.astype(data.dtype), voxNew2
+
+def zero_padd_truncate_fftshifted(arr, N, axis):
+    oldShape = arr.shape
+    newShape = np.array(oldShape).copy()
+    newShape[axis] = N
+    out = np.zeros(newShape, arr.dtype)
+    
+    # zero padd
+    if N > arr.shape[axis]  :
+        slices = []
+        for i in range(len(out.shape)):
+            if i != axis :
+                slices.append(slice(None))
+            else :
+                slices.append(slice(out.shape[i]//2 - arr.shape[i]//2, out.shape[i]//2 + (1+arr.shape[i])//2))
+         
+        out[slices] = np.fft.fftshift(arr)
+    # truncate
+    elif N < arr.shape[axis] :
+        slices = []
+        for i in range(len(out.shape)):
+            if i != axis :
+                slices.append(slice(None))
+            else :
+                slices.append(slice(arr.shape[i]//2 - out.shape[i]//2, arr.shape[i]//2 + (1+out.shape[i])//2))
+        
+        out         = np.fft.fftshift(arr)[slices]
+    else :
+        out[:] = arr
+        
+    out = np.fft.ifftshift(out)
+    return out
+
 
 
 def get_mol_density_ccp4_pdb(ccp4_fnam, pdb_fnam, radius, vox = None):
@@ -346,6 +421,7 @@ def put_density_in_U(solid_unit, mask, shape, originp):
     return U, ijk_rel
 
 
+"""
 if __name__ == '__main__':
     args, params = parse_cmdline_args()
     
@@ -434,3 +510,4 @@ if __name__ == '__main__':
         shutil.copy(args.config, outputdir)
     except Exception as e :
         print(e)
+"""
