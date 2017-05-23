@@ -229,7 +229,7 @@ def get_origin_voxel_unit(cdata):
 def create_envelope(data, atom_coords, originx, vox, radius, expand=True, return_density=True):
     # radius in pixels
     R         = np.array([radius/vox[0], radius/vox[1], radius/vox[2]])
-    if expand == True :
+    if expand is True :
         deltaShape = (np.ceil(R)*2).astype(np.int) + np.array([2,2,2])
         newShape   = np.asarray(data.shape) + deltaShape
         originx    = originx - vox * deltaShape/2
@@ -253,43 +253,24 @@ def create_envelope(data, atom_coords, originx, vox, radius, expand=True, return
     mask      = gaussian_filter(mask, R) > threshold
     
     if return_density is True :
-        density = np.zeros(mask.shape, dtype=data.dtype)
-        density[deltaShape[0]//2 : -deltaShape[0]//2, \
-                deltaShape[1]//2 : -deltaShape[1]//2, \
-                deltaShape[2]//2 : -deltaShape[2]//2] = data
+        if expand is True :
+            density = np.zeros(mask.shape, dtype=data.dtype)
+            density[deltaShape[0]//2 : -deltaShape[0]//2, \
+                    deltaShape[1]//2 : -deltaShape[1]//2, \
+                    deltaShape[2]//2 : -deltaShape[2]//2] = data
+        else :
+            density = data
         #density *= mask
         return mask, originx, density
     else :
         return mask, originx 
 
 def get_map_grid(ccp4, vox = None): 
-    from scipy.interpolate import RegularGridInterpolator
     # get x, y, z coords for the data along each dimension
     originp, originx, vox0, abc = get_origin_voxel_unit(ccp4)
-    
+
     if vox is not None :
-        # First Fourier padd / cut to get approximately the correct grid
-        data, vox0 = Fourier_padd_truncate(ccp4['data'], vox0, vox)
-        
-        # make the new grid
-        shape = data.shape
-        
-        # just make three len 3 empty lists
-        X, X2, shape2 = [[None for i in range(3)] for j in range(3)]
-        for i in range(3):
-            # current grid along each axis
-            X[i]      = np.arange(shape[i]) * vox0[i] + originx[i]  
-            # the new shape with the new grid 
-            shape2[i] = int(round(shape[i] * vox0[i] / vox[i]))
-            # the new grid along each axis
-            X2[i]     = np.linspace(X[i][0], X[i][-1], shape2[i])
-        
-        shape2 = tuple(shape2) 
-        
-        # now interpolate onto the desired grid (minor adjustment)
-        interp = RegularGridInterpolator(tuple(X), data)
-        x,y,z  = np.meshgrid(X2[0], X2[1], X2[2], indexing='ij')
-        data2  = interp( np.array([x.ravel(), y.ravel(), z.ravel()]).T ).reshape(shape2)
+        data2 = real_space_interpolation(ccp4['data'], vox0, vox)
     else :
         data2 = ccp4['data']
         vox   = vox0
@@ -299,6 +280,33 @@ def get_map_grid(ccp4, vox = None):
     geom['originx'] = originx
     geom['vox']     = np.array(vox)
     return data2, geom
+
+def real_space_interpolation(data, voxOld, voxNew):
+    """
+    use grid interpolation to interpolate data on a new grid 
+    keeping the edge pixels alligned
+    """
+    from scipy.interpolate import RegularGridInterpolator
+    # make the new grid
+    shape = data.shape
+    
+    # just make three len 3 empty lists
+    X, X2, shape2 = [[None for i in range(3)] for j in range(3)]
+    for i in range(3):
+        # current grid along each axis
+        X[i]      = np.arange(shape[i]) * voxOld[i]
+        # the new shape with the new grid 
+        shape2[i] = int(round(shape[i] * voxOld[i] / voxNew[i]))
+        # the new grid along each axis
+        X2[i]     = np.linspace(X[i][0], X[i][-1], shape2[i])
+    
+    shape2 = tuple(shape2) 
+    
+    # now interpolate onto the desired grid (minor adjustment)
+    interp = RegularGridInterpolator(tuple(X), data)
+    x,y,z  = np.meshgrid(X2[0], X2[1], X2[2], indexing='ij')
+    data2  = interp( np.array([x.ravel(), y.ravel(), z.ravel()]).T ).reshape(shape2)
+    return data2
 
 def Fourier_padd_truncate(data, voxOld, voxNew):
     """
@@ -329,8 +337,8 @@ def Fourier_padd_truncate(data, voxOld, voxNew):
     
     out = np.fft.ifftn(out)
     
-    for i in range(len(out.shape)):
-        out = out[:out.shape[i]//2]
+    slices = [slice(out.shape[i]//2) for i in range(len(out.shape))]
+    out = out[slices]
     
     # normalise to keep the same mean value in real space
     out *= out.size / float(data.size)
@@ -377,8 +385,8 @@ def get_mol_density_ccp4_pdb(ccp4_fnam, pdb_fnam, radius, vox = None):
     # read the ccp4 file: a dictionary 
     ccp4 = ccp4_reader.read_ccp4(ccp4_fnam)
     
-    # get the map on the desired grid
-    data, geom = get_map_grid(ccp4, vox)
+    # get the map on the original grid
+    data, geom = get_map_grid(ccp4, None)
     
     # read in the xyz coord for the atoms in the 
     # rigid unit
@@ -387,6 +395,21 @@ def get_mol_density_ccp4_pdb(ccp4_fnam, pdb_fnam, radius, vox = None):
     # get the mask of the single rigid unit
     mask, originx, data = create_envelope(data, xyz, geom['originx'], geom['vox'], radius, \
                                           expand=True, return_density=True)
+    
+    # this is a bit hacky
+    #####################
+    # Fourier padd / cut to get approximately the correct grid
+    data, vox2 = Fourier_padd_truncate(mask * data, geom['vox'], vox)
+    geom['vox'] = vox2
+    
+    # real-space interpolation to get the exact grid
+    data = real_space_interpolation(data, vox2, vox)
+    geom['vox'] = vox
+    
+    # now cut again 
+    mask, originx, data = create_envelope(data, xyz, geom['originx'], vox, radius, \
+                                          expand=True, return_density=True)
+        
     geom['originx'] = originx
     return data, mask, geom
 
@@ -420,8 +443,40 @@ def put_density_in_U(solid_unit, mask, shape, originp):
     U[ijk_U] = solid_unit[ijk_cut]
     return U, ijk_rel
 
+def mayavi_plot(map, geom, atom_coor=None, show=True):
+    '''
+    plots 3D map data and atom coordinates from pdb (optional)\n
+    geom : dictionary {} containing geometry parameters \n
+    - 'originx' = [x,y,z] coordinates of map origin relative to UC origin (Angstroms) \n
+    - 'vox' = Voxel dimensions (Angstroms) \n
+    - 'abc' = UC lenths (Angstroms) \n
+    atom_coor (optional): if given, atom coordinates from pdb are ploted \n
+    show : Set it to False if another plot follows which you want to plot simultaniously \n
+            if True, malab.show() is called --> Start interacting with figure \n
+            if False, will just create a new figure object w/o halting the program
+    '''
+    from mayavi import mlab
+    vox = geom['vox']
+    # make x y z grids
+    xx,yy,zz = np.mgrid[ 0:(map.shape[0]*vox[0]-0.0001):vox[0], \
+                0:(map.shape[1]*vox[1]-0.0001):vox[1], 0:(map.shape[2]*vox[2]-0.0001):vox[2] ]
+    mean = np.mean(map[np.nonzero(map)])
+    sigma = np.std(map[np.nonzero(map)])
+    mlab.contour3d(xx, yy, zz, map, contours=[mean-2*sigma,mean-sigma,mean,mean+sigma,mean+2*sigma], \
+                   transparent=True, opacity=0.5, vmin=(mean-2*sigma), vmax=(mean+2*sigma))
+    mlab.outline()
+    mlab.orientation_axes()
+    mlab.scalarbar(orientation='vertical')
+    mlab.axes(nb_labels=10, xlabel='x (A)', ylabel='y (A)', x_axis_visibility=True, y_axis_visibility=True, z_axis_visibility=False)
+    if atom_coor is not None:
+        originx = geom['originx']
+        mlab.points3d(atom_coor[0] - originx[0], atom_coor[1] - originx[1], \
+                      atom_coor[2] - originx[2], scale_factor=0.5, color=(1.0,1.0,1.0))
+    if show:
+        mlab.show()
+    else:
+        mlab.figure()        
 
-"""
 if __name__ == '__main__':
     args, params = parse_cmdline_args()
     
@@ -510,4 +565,3 @@ if __name__ == '__main__':
         shutil.copy(args.config, outputdir)
     except Exception as e :
         print(e)
-"""
