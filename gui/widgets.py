@@ -748,7 +748,7 @@ class Forward_model_pdb_widget(QtGui.QWidget):
             # diffraction volume view 
             #########################
             diff_h5 = self.f[self.diff_path][()]
-            tt = concatenate_slices(diff_h5, pad=10, fftshifted=True)**0.2
+            tt = concatenate_slices(diff_h5, pad=10, fftshifted=True)
              
             if init is False :
                 print('updating image, init = False')
@@ -763,7 +763,7 @@ class Forward_model_pdb_widget(QtGui.QWidget):
                 self.im_init = True
                     
         self.f.close()
-
+        
         if init :
             return splitter
 
@@ -884,7 +884,7 @@ class Phase_widget(QtGui.QWidget):
             #tt = (diff[0], padd, diff[1], padd, diff[2])
             #tt = np.concatenate(tt, axis=0)**0.2
             diff_h5 = self.f[self.diff_path][()]
-            tt = concatenate_slices(diff_h5, pad=10, fftshifted=True)**0.2
+            tt = concatenate_slices(diff_h5, pad=10, fftshifted=True)
              
             if init is False :
                 print('updating image, init = False')

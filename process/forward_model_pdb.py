@@ -360,7 +360,7 @@ if __name__ == '__main__':
     
     # make the map using phenix (generates a ccp4 file) 
     ccp4_fnam, pdb_fnam = make_map_ccp4(params['pdb_id'])
-    
+
     # get the solid_unit volume on the desired grid
     density, mask, geom = get_mol_density_ccp4_pdb(ccp4_fnam, pdb_fnam, params['cut_radius_ang'], params['pixel_size_ang'])
 
@@ -432,5 +432,14 @@ if __name__ == '__main__':
     try :
         import shutil
         shutil.copy(args.config, outputdir)
+    except Exception as e :
+        print(e)
+    
+    # copy the pdb file to the output directory
+    ###########################################
+    try :
+        import shutil
+        pdb_fnam = os.path.abspath(os.path.join('./temp', params['pdbid'] + '.pdb'))
+        shutil.copy(pdb_fnam, outputdir)
     except Exception as e :
         print(e)

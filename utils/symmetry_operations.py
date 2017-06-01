@@ -138,11 +138,11 @@ class P212121():
         # x = x
         T0 = np.ones(det_shape, dtype=np.complex128)
         # x = 0.5 + x, 0.5 - y, -z
-        T1 = T_fourier(det_shape, [-unitcell_size[0]/2., unitcell_size[1]/2., 0.0])
+        T1 = T_fourier(det_shape, [unitcell_size[0]/2., unitcell_size[1]/2., 0.0])
         # x = -x, 0.5 + y, 0.5 - z
         T2 = T_fourier(det_shape, [0.0, -unitcell_size[1]/2., unitcell_size[2]/2.])
         # x = 0.5 - x, -y, 0.5 + z
-        T3 = T_fourier(det_shape, [unitcell_size[0]/2., 0.0, -unitcell_size[2]/2.])
+        T3 = T_fourier(det_shape, [unitcell_size[0]/2., 0.0, unitcell_size[2]/2.])
         self.translations      = np.array([T0, T1, T2, T3])
         self.translations_conj = self.translations.conj()
     
@@ -263,10 +263,10 @@ class P212121():
         syms[3][:, 1:, :] = syms[3][:, -1:0:-1, :]
         
         translations = []
-        translations.append([-self.unitcell_size[0]//2, self.unitcell_size[1]//2, 0])
-        translations.append([0, -self.unitcell_size[1]//2, self.unitcell_size[2]//2])
-        translations.append([self.unitcell_size[0]//2, 0, -self.unitcell_size[2]//2])
-        
+        translations.append([self.unitcell_size[0]//2, self.unitcell_size[1]//2, 0])
+        translations.append([0, self.unitcell_size[1]//2, self.unitcell_size[2]//2])
+        translations.append([self.unitcell_size[0]//2, 0, self.unitcell_size[2]//2])
+
         for i, t in enumerate(translations):
             syms[i+1] = multiroll(syms[i+1], t)
         return syms
@@ -953,6 +953,26 @@ def make_lattice_subsample(u_pix, shape, N = None, subsamples=50):
         l = (l > 0.5 * l.max()).astype(np.float32)
 
     return l 
+
+def make_lattice_analytic(u_pix, shape, N = None):
+    """
+    L(q) = [(pi*N*u) \sum_n sinc(4 N u (q - n / u))]**2
+    """
+    q = np.fft.fftfreq(shape[0])
+    def l(x):
+        qi  = int(round(x*u_pix[0], 0))
+        out = np.sum([np.sinc(4.*N*u_pix[0]*(x - n/u_pix[0])) for n in range(qi-2,qi+2,1)])
+        return (np.pi*N*u_pix[0]*out)**2
+    
+    #L = np.array([l(qi) for qi in q])
+    
+    # integrate l over the width of a pixel for each pixel
+    import scipy.integrate as integrate
+    L =np.array([integrate.quad(l, qi - 0.5/shape[0], qi + 0.5/shape[0], limit=2*u_pix[0])[0] for qi in q])
+    return L
+
+
+
 
 def make_lattice(u_pix, shape, N = None):
     """
