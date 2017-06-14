@@ -91,6 +91,11 @@ class Mapper_ellipse():
         voxels : integer, optional, default (None)
             The number of pixels that the solid_unit can occupy.
         
+        voxel_sup_blur : float, optional, default (None)
+            The sigma value (in pixels) of the gaussian kernal that will
+            be convolved with the real space intensity before application
+            of the voxel number support.
+        
         overlap : ('unit_cell', 'crystal', None), optional, default (None)
             Prevent overlap of the solid unit when applying the support.  
 
@@ -191,6 +196,19 @@ class Mapper_ellipse():
         else :
             self.overlap = None
         
+        if isValid('voxel_sup_blur', args) :
+            self.voxel_sup_blur = args['voxel_sup_blur']
+        else :
+            self.voxel_sup_blur = None
+        
+        if isValid('voxel_sup_blur_frac', args) :
+            self.voxel_sup_blur_frac = args['voxel_sup_blur_frac']
+        else :
+            self.voxel_sup_blur_frac = None
+        
+        if self.voxel_sup_blur_frac is not None :
+            print('\n\nvoxel_sup_blur is not None...')
+        
         # make the crystal symmetry operator
         #-----------------------------------
         if isValid('sym', args):
@@ -244,19 +262,29 @@ class Mapper_ellipse():
         
         # finite support
         if self.voxel_number and (self.iters % self.support_update_freq == 0) :
-            #print('\n\nVoxel number support')
+            # bias low angle scatter for voxel support update
+            intensity = (out_solid * out_solid.conj()).real.astype(np.float32)
+            if self.voxel_sup_blur is not None :
+                print('\n\nbluring sample...')
+                import scipy.ndimage.filters
+                from scipy.ndimage.filters import gaussian_filter
+                intensity = gaussian_filter(intensity, self.voxel_sup_blur, mode='wrap')
+            
+            if self.voxel_sup_blur_frac is not None :
+                self.voxel_sup_blur *= self.voxel_sup_blur_frac
+                print('\n\nnew blur sigma value...', self.voxel_sup_blur, self.voxel_sup_blur_frac)
+            
             if self.overlap == 'unit_cell' :
-                intensity = (out_solid * out_solid.conj()).real.astype(np.float32)
-                self.voxel_support = choose_N_highest_pixels( intensity, self.voxel_number, \
+                self.voxel_support = choose_N_highest_pixels(intensity, self.voxel_number, \
                                      support = self.support, mapper = self.sym_ops.solid_syms_real)
                 #self.voxel_support = voxel_number_support_single_connected_region(intensity, self.voxel_number, init_sup=self.voxel_support)
             
             elif self.overlap == 'crystal' :
                 # try using the crystal mapping instead of the unit-cell mapping
-                self.voxel_support = choose_N_highest_pixels( (out_solid * out_solid.conj()).real.astype(np.float32), self.voxel_number, \
+                self.voxel_support = choose_N_highest_pixels(intensity, self.voxel_number, \
                                      support = self.support, mapper = self.sym_ops.solid_to_crystal_real)
             elif self.overlap is None :
-                self.voxel_support = choose_N_highest_pixels( (out_solid * out_solid.conj()).real.astype(np.float32), self.voxel_number, \
+                self.voxel_support = choose_N_highest_pixels(intensity, self.voxel_number, \
                                      support = self.support, mapper = None)
             else :
                 raise ValueError("overlap must be one of 'unit_cell', 'crystal' or None")
@@ -360,9 +388,9 @@ class Mapper_ellipse():
             J = scan_points[1]
             K = scan_points[2]
         else :
-            I = range(self.sym_ops.unitcell_size[0])
-            J = range(self.sym_ops.unitcell_size[1])
-            K = range(self.sym_ops.unitcell_size[2])
+            I = range(self.sym_ops.Cheshire_cell[0])
+            J = range(self.sym_ops.Cheshire_cell[1])
+            K = range(self.sym_ops.Cheshire_cell[2])
         
         errors = np.zeros((len(I), len(J), len(K)), dtype=np.float)
         errors.fill(np.inf)

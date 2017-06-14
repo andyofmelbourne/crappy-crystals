@@ -86,7 +86,7 @@ def phase(mapper, iters_str = '100DM 100ERA', beta=1):
            O, info = phasing_3d.DM(iters, mapper = mapper, beta=beta)
         
         if alg == 'cheshire':
-           O, info = mapper.scans_cheshire(O, scan_points=[range(-3,3,1),range(-3,3,1),range(-3,3,1)])
+           O, info = mapper.scans_cheshire(O, scan_points=None)
            Cheshire_error_map = info['error_map'].copy()
          
         eMod += info['eMod']
@@ -171,6 +171,22 @@ if __name__ == '__main__':
     else :
         voxels = params['voxels']
     
+    # voxel_sup_blur support
+    if params['voxel_sup_blur'] is None :
+        voxel_sup_blur = None
+    elif type(params['voxel_sup_blur']) != float and params['voxel_sup_blur'][0] == '/'  :
+        voxel_sup_blur = f[params['voxel_sup_blur']][()]
+    else :
+        voxel_sup_blur = params['voxel_sup_blur']
+    
+    # voxel_sup_blur_frac support
+    if params['voxel_sup_blur_frac'] is None :
+        voxel_sup_blur_frac = None
+    elif type(params['voxel_sup_blur_frac']) != float and params['voxel_sup_blur_frac'][0] == '/'  :
+        voxel_sup_blur_frac = f[params['voxel_sup_blur_frac']][()]
+    else :
+        voxel_sup_blur_frac = params['voxel_sup_blur_frac']
+    
     # support update frequency
     if params['support_update_freq'] is None :
         support_update_freq = None
@@ -211,6 +227,8 @@ if __name__ == '__main__':
                                  diffuse_weighting = diffuse_weighting, 
                                  solid_unit        = solid_unit,
                                  voxels            = voxels,
+                                 voxel_sup_blur    = voxel_sup_blur,
+                                 voxel_sup_blur_frac = voxel_sup_blur_frac,
                                  overlap           = params['overlap'],
                                  support           = support,
                                  support_update_freq = support_update_freq,
