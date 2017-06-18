@@ -174,6 +174,27 @@ class P212121():
             
             syms *= self.translations
         return syms
+    
+    def make_inds_Ts_masked(self, mask):
+        shape = mask.shape
+        ii = np.fft.fftfreq(shape[0], 1./shape[0]).astype(np.int)
+        jj = np.fft.fftfreq(shape[1], 1./shape[1]).astype(np.int)
+        kk = np.fft.fftfreq(shape[2], 1./shape[2]).astype(np.int)
+        ii, jj, kk = np.meshgrid(ii, jj, kk, indexing='ij')
+        ii = ii[mask]
+        jj = jj[mask]
+        kk = kk[mask]
+        
+        inds = np.arange(np.sum(mask))#np.where(mask)
+        temp = np.zeros(shape, dtype=np.int)
+        temp[mask] = inds
+        inds      = np.array([temp[ ii, jj, kk], temp[ ii,-jj,-kk], temp[-ii, jj,-kk], temp[-ii,-jj, kk]])
+        # store the translations for each orientation of the solid_unit on the Braggs
+        if self.translations is None :
+            self.make_Ts()
+        Ts = np.array([self.translations[iii][(ii,jj,kk)] for iii in range(4)])
+        return inds, Ts
+
 
     def solid_syms_Fourier_masked(self, solid, i, j, k, apply_translation = True, syms = None):
         """
