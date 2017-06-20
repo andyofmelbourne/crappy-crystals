@@ -264,13 +264,13 @@ class Mapper_ellipse():
         if self.voxel_number and (self.iters % self.support_update_freq == 0) :
             # bias low angle scatter for voxel support update
             intensity = (out_solid * out_solid.conj()).real.astype(np.float32)
-            if self.voxel_sup_blur is not None :
+            if self.voxel_sup_blur is not None and self.voxel_sup_blur > 0.01 :
                 print('\n\nbluring sample...')
                 import scipy.ndimage.filters
                 from scipy.ndimage.filters import gaussian_filter
                 intensity = gaussian_filter(intensity, self.voxel_sup_blur, mode='wrap')
             
-            if self.voxel_sup_blur_frac is not None :
+            if self.voxel_sup_blur_frac is not None and self.voxel_sup_blur > 0.01 :
                 self.voxel_sup_blur *= self.voxel_sup_blur_frac
                 print('\n\nnew blur sigma value...', self.voxel_sup_blur, self.voxel_sup_blur_frac)
             
@@ -374,7 +374,7 @@ class Mapper_ellipse():
             den += np.sum( (array0[i] * array0[i].conj()).real ) 
         return np.sqrt(num / den)
 
-    def scans_cheshire(self, solid, scan_points=None, err = 'Emod'):
+    def scans_cheshire_old(self, solid, scan_points=None, err = 'Emod'):
         """
         scan the solid unit through the cheshire cell 
         until the best agreement with the data is found.
@@ -488,6 +488,42 @@ class Mapper_ellipse():
         info['eCon'] = [self.l2norm(self.modes - modes, modes)]
         info.update(self.finish(modes))
         return s1, info
+    
+    def scans_cheshire(self, solid, scan_points=None, err = None):
+        """
+        err is deprecated
+        """
+        # scan through the cheshire cell
+        # for every permutation of the solid unit
+        from chesh import chesh_scan_w_flips
+        shift, errors, sl = chesh_scan_w_flips(self.amp**2, self.sym_ops.unitcell_size, solid, 
+                                               self.diffuse_weighting, self.unit_cell_weighting, 
+                                               self.mask, spacegroup = self.sym_ops.spacegroup)
+        
+        print('\n\nCheshire scan:', shift, 'shift', sl, 'orientation', np.min(errors), 'error')
+        print('\n\nCheshire scan:')
+        # now shift the sample and support
+        sout = np.roll(solid[sl], shift[0], 0)
+        sout = np.roll(sout     , shift[1], 1)
+        sout = np.roll(sout     , shift[2], 2)
+        
+        supout = np.roll(self.voxel_support[sl], shift[0], 0)
+        supout = np.roll(supout   , shift[1], 1)
+        supout = np.roll(supout   , shift[2], 2)
+        
+        self.voxel_support = supout.copy()
+        
+        # update the modes
+        modes = self.sym_ops.solid_syms_Fourier(np.fft.fftn(sout), apply_translation=True)
+
+        # calculate errors
+        info = {}
+        info['eMod']      = [self.Emod(modes)]
+        info['error_map'] = errors
+        info['eCon']      = [self.l2norm(self.modes - modes, modes)]
+        info.update(self.finish(modes))
+        return sout, info
+
 
 def choose_N_highest_pixels(array, N, tol = 1.0e-10, maxIters=1000, mapper = None, support = None):
     """

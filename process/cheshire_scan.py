@@ -117,15 +117,15 @@ def chesh_scan_P212121(diff, unit_cell, sin, D, B, mask):
     print('lowest error at: i, j, k, err', i, j, k, errors[i,j,k])
       
     # shift
-    qi = np.fft.fftfreq(s.shape[0]) 
-    qj = np.fft.fftfreq(s.shape[1])
-    qk = np.fft.fftfreq(s.shape[2])
-    T0 = np.exp(- 2J * np.pi * I[i] * qi)
-    T1 = np.exp(- 2J * np.pi * J[j] * qj)
-    T2 = np.exp(- 2J * np.pi * K[k] * qk)
-    phase_ramp = reduce(np.multiply.outer, [T0, T1, T2])
-    s1         = s * phase_ramp
-    s1         = np.fft.ifftn(s1)
+    #qi = np.fft.fftfreq(s.shape[0]) 
+    #qj = np.fft.fftfreq(s.shape[1])
+    #qk = np.fft.fftfreq(s.shape[2])
+    #T0 = np.exp(- 2J * np.pi * I[i] * qi)
+    #T1 = np.exp(- 2J * np.pi * J[j] * qj)
+    #T2 = np.exp(- 2J * np.pi * K[k] * qk)
+    #phase_ramp = reduce(np.multiply.outer, [T0, T1, T2])
+    #s1         = s * phase_ramp
+    #s1         = np.fft.ifftn(s1)
     return errors[i,j,k], (I[i], J[j], K[k])
 
 def shift_Fourier(s, shift):
@@ -152,23 +152,37 @@ def calc_pearson(x, y):
     N  = x.size
     return (N * XY - X*Y)/np.sqrt( (N*XX - X**2)*(N*YY - Y**2))
 
+def chesh_scan_P212121_wrap(x):
+    return chesh_scan_P212121(*x)
 
 def chesh_scan_w_flips(diff, unit_cell, sin, D, B, mask, spacegroup = 'P212121'):
     if spacegroup == 'P212121':
         # slices gives us the 8 possibilities
         slices = [(slice(None, None, 2*((rank//4)%2)-1), slice(None, None, 2*((rank//2)%2)-1), slice(None, None, 2*((rank)%2)-1)) for rank in range(8)]
         
-        sin = sin[slices]
-        error, shift = chesh_scan_P212121(diff, unit_cell, sin, D, B, mask)
+        from multiprocessing import Pool
+        import itertools
         
         args = itertools.izip( itertools.repeat(diff), itertools.repeat(unit_cell), [sin[s] for s in slices], \
                                itertools.repeat(D), itertools.repeat(B), itertools.repeat(mask))
-    
-        res = pool.map() 
+         
+        pool = Pool()
+        res = pool.map(chesh_scan_P212121_wrap, args) 
         errors = np.array([i[0] for i in res])
         shifts = np.array([i[1] for i in res])
-
-
+        
+        i = np.argmin(errors)
+        # shift and permiate the sample and support
+        shift = shifts[i]
+        error = errors[i]
+        sl    = slices[i]
+        return shift, error, sl
+    
+    elif spacegroup == 'P1':
+        return (0,0,0), 0., (slice(None), slice(None), slice(None))
+    
+    else :
+        raise ValueError('spacegroup ' + spacegroup + ' unsupported')
 
 if __name__ == '__main__':
     f = h5py.File('hdf5/pdb/pdb.h5', 'r')
@@ -186,8 +200,39 @@ if __name__ == '__main__':
         mask = 1
     f.close()
 
+    shift, error, sl = chesh_scan_w_flips(diff, unit_cell, sin, D, B, mask, spacegroup = 'P212121')
+    
+    # now shift the sample and support
+    sout = np.roll(sin[sl], shift[0], 0)
+    sout = np.roll(sout   , shift[1], 1)
+    sout = np.roll(sout   , shift[2], 2)
+    
+    supout = np.roll(support[sl], shift[0], 0)
+    supout = np.roll(supout   , shift[1], 1)
+    supout = np.roll(supout   , shift[2], 2)
 
+    assert(np.allclose(sout, shift_Real(sin[sl], shift)))
 
+    if True :
+        # save
+        g = h5py.File('temp.h5')
+        if 'solid_unit' in g :
+            del g['solid_unit']
+        g['solid_unit'] = sout
+        
+        if 'support' in g :
+            del g['support']
+        g['support'] = supout
+
+        if 'error' in g :
+            del g['error']
+        g['error'] = np.array(error)
+
+        if 'shift' in g :
+            del g['shift']
+        g['shift'] = np.array(shift)
+
+        g.close()
 """
 from mpi4py import MPI
 

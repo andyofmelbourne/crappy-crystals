@@ -26,6 +26,8 @@ class P1():
               = [ 0,  1,  2,  3, -4, -3, -2, -1]
     i flipped = [ 0, -1, -2, -3, -4,  3,  2,  1]
     """
+    spacegroup = 'P1'
+    
     def __init__(self, unitcell_size, det_shape, dtype=np.complex128):
         # store the tranlation ramps
         # x = x
@@ -112,6 +114,8 @@ class P212121():
               = [ 0,  1,  2,  3, -4, -3, -2, -1]
     i flipped = [ 0, -1, -2, -3, -4,  3,  2,  1]
     """
+    spacegroup = 'P212121'
+    
     def __init__(self, unitcell_size, det_shape, dtype=np.complex128):
         # only calculate the translations when they are needed
         self.translations      = None
