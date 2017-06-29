@@ -500,7 +500,7 @@ if __name__ == '__main__':
 
     # make the input
     ################
-    unit_cell  = geom['abc'] / geom['vox']
+    unit_cell  = np.rint(geom['abc'] / geom['vox'])
     N          = params['n']
     sigma      = params['sigma']
     del params['n']
