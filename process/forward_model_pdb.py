@@ -50,10 +50,12 @@ root = os.path.split(root)[0]
 sys.path.append(os.path.join(root, 'utils'))
 
 from calculate_constraint_ratio import calculate_constraint_ratio
+import maps
 import io_utils
 import forward_sim
 import ccp4_reader
 import pdb_parser
+import symmetry_operations 
 
 def parse_cmdline_args(default_config='forward_model_pdb.ini'):
     parser = argparse.ArgumentParser(description="calculate the forward model diffraction intensity for a disorded crystal who's structure is given by a pdb entry. The results are output into a .h5 file.")
@@ -395,12 +397,15 @@ def get_mol_density_ccp4_pdb(ccp4_fnam, pdb_fnam, radius, vox = None):
     # get the mask of the single rigid unit
     mask, originx, data = create_envelope(data, xyz, geom['originx'], geom['vox'], radius, \
                                           expand=True, return_density=True)
+    print('np.sum(np.abs(data)**2):',np.sum(np.abs(data)**2))
+    print('np.sum(np.abs(mask)**2):',np.sum(np.abs(mask)**2))
     
     # this is a bit hacky
     #####################
     # Fourier padd / cut to get approximately the correct grid
     data, vox2 = Fourier_padd_truncate(mask * data, geom['vox'], vox)
     geom['vox'] = vox2
+    print('np.sum(np.abs(data)**2):',np.sum(np.abs(data)**2))
     
     # real-space interpolation to get the exact grid
     data = real_space_interpolation(data, vox2, vox)
@@ -494,10 +499,14 @@ if __name__ == '__main__':
 
     # get the solid_unit volume on the desired grid
     density, mask, geom = get_mol_density_ccp4_pdb(ccp4_fnam, pdb_fnam, params['cut_radius_ang'], params['pixel_size_ang'])
+    print('np.sum(np.abs(density)**2):',np.sum(np.abs(density)**2))
+    print('np.sum(np.abs(mask)**2):',np.sum(np.abs(mask)**2))
 
     # now put the single rigid unit in the unit-cell
     solid_unit, ijk_rel = put_density_in_U(density*mask, mask, params['shape'], geom['originx']/geom['vox'])
+    print('np.sum(np.abs(solid_unit)**2):',np.sum(np.abs(solid_unit)**2))
 
+    
     # make the input
     ################
     unit_cell  = np.rint(geom['abc'] / geom['vox'])
@@ -505,6 +514,24 @@ if __name__ == '__main__':
     sigma      = params['sigma']
     del params['n']
     del params['sigma']
+
+    voxel_support = np.abs(solid_unit)>0.
+    
+    # enforce solvent fraction
+    ##########################
+    if params['voxels'] is not None :
+        print('seting the voxel number to:', params['voxels'])
+        voxel_support = maps.choose_N_highest_pixels(np.abs(solid_unit)**2, params['voxels'])
+
+    # remove overlap
+    ################
+    if params['remove_overlap'] is True: 
+        sym_ops = symmetry_operations.P212121(unit_cell, solid_unit.shape)
+        overlap = np.where((sym_ops.solid_to_crystal_real(voxel_support) * voxel_support) == 2)
+        voxel_support[overlap] = 0
+        print('removing overlap:', len(overlap[0]), 'pixels, voxels=',np.sum(voxel_support) )
+        
+    solid_unit   *= voxel_support
     
     # calculate the diffraction data and metadata
     #############################################

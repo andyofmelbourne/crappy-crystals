@@ -160,7 +160,7 @@ def DM(iters, beta = 1, **args):
 
     if iters > 0  and rank==0:
         print('\n\nalgrithm progress iteration convergence modulus error')
-    
+
     if beta == 1 :
         for i in range(iters) :
             
@@ -189,6 +189,7 @@ def DM(iters, beta = 1, **args):
             
             eMods.append(eMod)
             eCons.append(eCon)
+
     else :
         modes_mod = mapper.Pmod(modes)
         for i in range(iters) :

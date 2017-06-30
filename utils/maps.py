@@ -589,7 +589,7 @@ def choose_N_highest_pixels(array, N, tol = 1.0e-10, maxIters=1000, mapper = Non
         # number of voxels then include 
         # some of the pixels where array == s
         count      = np.sum(S)
-        ii, jj, kk = np.where((np.abs(array-s)<=tol) * (max_support * support > 0))
+        ii, jj, kk = np.where((np.abs(array-s)<=tol) * (max_support * sup > 0))
         l          = N - count
         print(count, N, l, len(ii))
         if l > 0 :
