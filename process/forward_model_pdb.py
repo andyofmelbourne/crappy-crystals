@@ -514,6 +514,13 @@ if __name__ == '__main__':
     info['unit_cell_ang']    = geom['abc']
     info['density_cut']      = mask * density
     
+    # calculate the constraint ratio
+    ################################
+    omega_con, omega_Bragg, omega_global  = calculate_constraint_ratio(info['support'], params['space_group'], unit_cell)
+    info['omega_continuous'] = omega_con
+    info['omega_Bragg']      = omega_Bragg
+    info['omega_global']     = omega_global
+
     # output
     ########
     outputdir = os.path.split(os.path.abspath(args.filename))[0]

@@ -14,6 +14,11 @@ except NameError :
 import numpy as np
 import os, sys
 
+try :
+    import itertools.izip as zip
+except ImportError :
+    pass
+
 # import python modules using the relative directory 
 # locations this way the repository can be anywhere 
 root = os.path.split(os.path.abspath(__file__))[0]
@@ -29,10 +34,14 @@ def chesh_scan_P212121(diff, unit_cell, sin, D, B, mask):
     I = range(sym_ops.Cheshire_cell[0])
     J = range(sym_ops.Cheshire_cell[1])
     K = range(sym_ops.Cheshire_cell[2])
+    #I = range(unit_cell[0])
+    #J = range(unit_cell[1])
+    #K = range(unit_cell[2])
     
     # make the errors
     errors = np.zeros((len(I), len(J), len(K)), dtype=np.float)
     errors.fill(np.inf)
+    print('errors.shape',errors.shape)
     
     # only evaluate the error on Bragg peaks that are strong 
     thresh = np.percentile(B[B>0], 90.) 
@@ -111,7 +120,7 @@ def chesh_scan_w_flips(diff, unit_cell, sin, D, B, mask, spacegroup = 'P212121')
         from multiprocessing import Pool
         import itertools
         
-        args = itertools.izip( itertools.repeat(diff), itertools.repeat(unit_cell), [sin[s].copy() for s in slices], \
+        args = zip( itertools.repeat(diff), itertools.repeat(unit_cell), [sin[s].copy() for s in slices], \
                                itertools.repeat(D), itertools.repeat(B), itertools.repeat(mask))
          
         pool = Pool()
