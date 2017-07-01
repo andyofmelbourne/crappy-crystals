@@ -84,11 +84,96 @@ def parse_cmdline_args(default_config='forward_model_pdb.ini'):
     
     return args, params
 
-def make_map_ccp4(pdbid, res=5.):
+def make_maps_params(pdb_fnam, cif_fnam, output, res_ang = 0.25):
+    outputdir = os.path.split(output)[0]
+    args = {'pdb_fnam': pdb_fnam, 'cif_fnam': cif_fnam, 'outputdir': outputdir, 'output': output, 'res': res_ang}
+    maps_params =  \
+    """
+     maps {{
+       input {{
+         pdb_file_name = "{pdb_fnam}"
+         reflection_data {{
+           file_name = "{cif_fnam}"
+           labels = None
+           high_resolution = None
+           low_resolution = None
+           outliers_rejection = True
+           french_wilson_scale = True
+           french_wilson {{
+             max_bins = 60
+             min_bin_size = 40
+           }}
+           sigma_fobs_rejection_criterion = None
+           sigma_iobs_rejection_criterion = None
+           r_free_flags {{
+             file_name = None
+             label = None
+             test_flag_value = None
+             ignore_r_free_flags = False
+           }}
+         }}
+       }}
+       output {{
+         directory = "{outputdir}"
+         prefix = None
+         job_title = None
+         fmodel_data_file_format = mtz
+         include_r_free_flags = False
+       }}
+       scattering_table = wk1995 it1992 *n_gaussian neutron electron
+       wavelength = None
+       bulk_solvent_correction = True
+       anisotropic_scaling = True
+       skip_twin_detection = False
+       omit {{
+         method = *simple
+         selection = None
+       }}
+       map {{
+         map_type = DFc
+         format = xplor *ccp4
+         file_name = "{output}"
+         fill_missing_f_obs = False
+         grid_resolution_factor = {res}
+         scale = *sigma volume
+         region = *selection cell
+         atom_selection = None
+         atom_selection_buffer = 3
+         acentrics_scale = 2
+         centrics_pre_scale = 1
+         sharpening = False
+         sharpening_b_factor = None
+         exclude_free_r_reflections = False
+         isotropize = True
+       }}
+     }}
+    """.format(**args)
+    return maps_params
+
+def get_pdb_mtz(pdbid, dirnam = './temp'):
+    # fetch the pdb info
+    from subprocess import PIPE, Popen
+    import shlex
+    import os
+    #dirnam2 = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(__file__)), dirnam))
+    dirnam2 = os.path.abspath(dirnam)
+    
+    cmd = 'mkdir ' + dirnam2
+    p = Popen(shlex.split(cmd))
+    p.wait()
+    
+    cmd = 'phenix.fetch_pdb --mtz ' + pdbid
+    print(cmd, dirnam2)
+    p = Popen(shlex.split(cmd), cwd=dirnam2)
+    p.wait()
+
+def make_map_ccp4(pdbid):
     # make the maps.params file
     dirnam = os.path.abspath('./temp')
     pdb_fnam = os.path.abspath(os.path.join(dirnam, pdbid + '.pdb'))
-    output   = os.path.abspath(os.path.join(dirnam, pdbid + '_fmodel.ccp4'))
+    cif_fnam = os.path.abspath(os.path.join(dirnam, pdbid + '-sf.cif'))
+    output   = os.path.abspath(os.path.join(dirnam, pdbid + '-map.ccp4'))
+    maps_params = make_maps_params(pdb_fnam, cif_fnam, output)
     
     # if the output file already exists then skip this stuff
     if os.path.exists(output):
@@ -98,21 +183,20 @@ def make_map_ccp4(pdbid, res=5.):
     if not os.path.exists(pdb_fnam):
         get_pdb_mtz(pdbid, dirnam)
     
-    # run the code 
-    cmd = 'phenix.fmodel ' + pdb_fnam + ' high_resolution='+str(res)
-    print(cmd)
-    p = Popen(shlex.split(cmd), cwd=dirnam)
-    p.wait()
+    # if the file exists then delete it 
+    fnam = os.path.abspath(os.path.join(dirnam, 'maps.params'))
+    if os.path.exists(fnam):
+        os.remove(fnam)
+    
+    f = open(fnam, 'w')
+    f.writelines(maps_params)
+    f.close()
     
     # run the code 
-    cmd = 'phenix.mtz2map ' + pdb_fnam+'.mtz ' + pdb_fnam + ' include_fmodel=True'
-    print(cmd)
-    p = Popen(shlex.split(cmd), cwd=dirnam)
+    cmd = 'phenix.maps ' + fnam
+    p = Popen(shlex.split(cmd))
     p.wait()
-    
-    print('#########################################')
-    print('ccp4_fnam',pdb_fnam+'_fmodel.ccp4')
-    return pdb_fnam+'_fmodel.ccp4', pdb_fnam
+    return output, pdb_fnam
 
 def get_origin_voxel_unit(cdata):
     """
@@ -305,7 +389,7 @@ def get_mol_density_ccp4_pdb(ccp4_fnam, pdb_fnam, radius, vox = None):
     
     # get the map on the original grid
     data, geom = get_map_grid(ccp4, None)
-
+    
     # read in the xyz coord for the atoms in the 
     # rigid unit
     xyz = pdb_parser.coor(pdb_fnam)
@@ -313,22 +397,18 @@ def get_mol_density_ccp4_pdb(ccp4_fnam, pdb_fnam, radius, vox = None):
     # get the mask of the single rigid unit
     mask, originx, data = create_envelope(data, xyz, geom['originx'], geom['vox'], radius, \
                                           expand=True, return_density=True)
+    print('np.sum(np.abs(data)**2):',np.sum(np.abs(data)**2))
+    print('np.sum(np.abs(mask)**2):',np.sum(np.abs(mask)**2))
     
     # this is a bit hacky
     #####################
     # Fourier padd / cut to get approximately the correct grid
     data, vox2 = Fourier_padd_truncate(mask * data, geom['vox'], vox)
     geom['vox'] = vox2
-    
-    # get rid of -'s from Fourier ringing
-    hist, bins = np.histogram(data, bins=1000)
-    z = bins[np.argmax(hist)]
-    data -= z
-    data[data<0] = 0.
+    print('np.sum(np.abs(data)**2):',np.sum(np.abs(data)**2))
     
     # real-space interpolation to get the exact grid
     data = real_space_interpolation(data, vox2, vox)
-    #data = real_space_interpolation(data, geom['vox'], vox)
     geom['vox'] = vox
     
     # now cut again 
@@ -415,14 +495,18 @@ if __name__ == '__main__':
         raise ValueError('output_file in the ini file is not valid, or the filename was not specified on the command line')
     
     # make the map using phenix (generates a ccp4 file) 
-    ccp4_fnam, pdb_fnam = make_map_ccp4(params['pdb_id'], np.max(params['pixel_size_ang']))
+    ccp4_fnam, pdb_fnam = make_map_ccp4(params['pdb_id'])
 
     # get the solid_unit volume on the desired grid
     density, mask, geom = get_mol_density_ccp4_pdb(ccp4_fnam, pdb_fnam, params['cut_radius_ang'], params['pixel_size_ang'])
+    print('np.sum(np.abs(density)**2):',np.sum(np.abs(density)**2))
+    print('np.sum(np.abs(mask)**2):',np.sum(np.abs(mask)**2))
 
     # now put the single rigid unit in the unit-cell
     solid_unit, ijk_rel = put_density_in_U(density*mask, mask, params['shape'], geom['originx']/geom['vox'])
+    print('np.sum(np.abs(solid_unit)**2):',np.sum(np.abs(solid_unit)**2))
 
+    
     # make the input
     ################
     unit_cell  = np.rint(geom['abc'] / geom['vox'])
