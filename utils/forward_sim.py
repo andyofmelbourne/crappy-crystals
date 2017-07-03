@@ -26,11 +26,14 @@ def make_exp(sigma, shape):
     if sigma is np.inf :
         print('sigma is inf setting exp = 0')
         exp     = np.zeros(i.shape, dtype=np.float)
-    elif sigma == 0. :
+    elif sigma is 0 :
         print('sigma is 0 setting exp = 1')
         exp     = np.ones(i.shape, dtype=np.float)
     else :
-        exp     = np.exp(-4. * sigma**2 * np.pi**2 * (i**2 + j**2 + k**2))
+        try :
+            exp = np.exp(-4. * np.pi**2 * ((sigma[0]*i)**2 +(sigma[1]*j)**2+(sigma[2]*k)**2))
+        except TypeError: 
+            exp = np.exp(-4. * sigma**2 * np.pi**2 * (i**2 + j**2 + k**2))
     return exp
 
 def generate_diff(solid_unit, unit_cell, N, sigma, **params):

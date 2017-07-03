@@ -100,7 +100,7 @@ def make_map_ccp4(pdbid, res=5.):
     
     # run the code 
     cmd = 'phenix.fmodel ' + pdb_fnam + ' high_resolution='+str(res)
-    print(cmd)
+    print(cmd, dirnam)
     p = Popen(shlex.split(cmd), cwd=dirnam)
     p.wait()
     
@@ -451,8 +451,8 @@ if __name__ == '__main__':
     
     # calculate the diffraction data and metadata
     #############################################
-    diff, info = forward_sim.generate_diff(solid_unit, unit_cell, N, sigma, **params)
-
+    diff, info = forward_sim.generate_diff(solid_unit, unit_cell, N, sigma/params['pixel_size_ang'], **params)
+    
     info['unit_cell_pixels'] = unit_cell
     info['unit_cell_ang']    = geom['abc']
     info['density_cut']      = mask * density

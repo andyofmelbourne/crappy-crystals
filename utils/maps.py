@@ -22,7 +22,7 @@ import add_noise_3d
 import io_utils
 
 import pyximport; pyximport.install()
-from ellipse_2D_cython import project_2D_Ellipse_arrays_cython
+#from ellipse_2D_cython import project_2D_Ellipse_arrays_cython
 from ellipse_2D_cython_new import project_2D_Ellipse_arrays_cython_test
 
 import phasing_3d
