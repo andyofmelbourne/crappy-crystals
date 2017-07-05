@@ -34,9 +34,10 @@ rank = comm.Get_rank()
 size = comm.Get_size()
 
 # hack for import error in pyximport
-import time
-time.sleep(rank*0.5)
-import maps
+for r in range(size):
+    if rank == r :
+        import maps
+    comm.barrier()
 
 import io_utils
 import duck_3D
@@ -168,39 +169,47 @@ def centre_array(O):
     out = scipy.ndimage.interpolation.shift(O.real, shift, mode='wrap', order=1) + 1J*scipy.ndimage.interpolation.shift(O.imag, shift, mode='wrap', order=1)
     return out
 
-def phase_align(O1, O2):
+def align(O1, O2, order=1):
+    con  = np.fft.ifftn( np.fft.fftn(O1) * np.fft.fftn(O2).conj() )
+    rmin = np.argmax( (con * con.conj()).real )
+    shift = np.array(np.unravel_index(rmin, O2.shape))
+    import scipy.ndimage
+    out  = scipy.ndimage.interpolation.shift(O2.real, shift, mode='wrap', order=1) + 1J*scipy.ndimage.interpolation.shift(O2.imag, shift, mode='wrap', order=1)
+    return out
+
+def align_any_orientation(O1, O2):
     # check different orientations
     # slices gives us the 8 possibilities
     slices = [(slice(None, None, 2*((i//4)%2)-1), slice(None, None, 2*((i//2)%2)-1), slice(None, None, 2*((i)%2)-1)) for i in range(8)]
     
     errmin = np.inf
-    for o in [O2[s].copy() for s in slices]:
-        Oc    = centre_array(o)
+    for s in slices:
+        Oc    = align(O1, O2[s])
         delta = O1 - Oc
         err   = np.sum((delta * delta.conj()).real)
+        print(err, s)
         if err < errmin :
             O = Oc.copy()
+            errmin = err
     return O
 
-def align_Os(O):
+def align_Os(O0, O):
     # set the mean phase to zero
     if np.iscomplex(O.ravel()[0]):
         s = np.sum(O)
         phase = np.arctan2(s.imag, s.real)
         O *= np.exp(-1J * phase)
+        s = np.sum(O0)
+        phase = np.arctan2(s.imag, s.real)
+        O0 *= np.exp(-1J * phase)
     
     # conjugate
     if np.sum(np.angle(O)) < 0.:
         O = O.conj()
+    if np.sum(np.angle(O0)) < 0.:
+        O0 = O0.conj()
     
-    if rank == 0 :
-        O = centre_array(O)
-    
-    # get everyone to align their object with respect to the first
-    O0 = comm.bcast(O, root=0)
-    
-    O = phase_align(O0, O)
-    
+    O = align_any_orientation(O0, O)
     return O
 
 if __name__ == '__main__':
@@ -311,16 +320,38 @@ if __name__ == '__main__':
 
     # merge the results
     ###################
+    eMod = np.array(comm.allgather(eMod))
+    eCon = np.array(comm.allgather(eCon))
+    
+    # get the best retrieval
+    i = np.argmin(eMod[:, -1])
+    
+    # get everyone to align their object with respect to the first
+    O0 = comm.bcast(O, root=i)
+
     print('merging Os...',)
-    O = align_Os(O)
+    O = align_Os(O0, O)
     O = comm.gather(O) 
     print('Done.')
     
-    eMod = np.array(comm.gather(eMod))
-    eCon = np.array(comm.gather(eCon))
+    # output
+    ########
+    if params['output_file'] is not None and params['output_file'] is not False :
+        filename = params['output_file']
+    else :
+        filename = args.filename
     
+    outputdir = os.path.split(os.path.abspath(filename))[0]
+    
+    # mkdir if it does not exist
+    if not os.path.exists(outputdir):
+        os.makedirs(outputdir)
+
     if rank == 0: 
-        O = np.mean([O[i] for i in np.where(eMod[:,-1] > np.mean(eMod[:,-1]))[0]], axis=0)
+        O = np.mean([O[i] for i in np.where(eMod[:,-1] < np.mean(eMod[:,-1]))[0]], axis=0)
+        
+        mapper.modes = mapper.sym_ops.solid_syms_Fourier(np.fft.fftn(O), apply_translation=True)
+        info.update(mapper.finish(mapper.modes))
         
         # calculate the fidelity if we have the ground truth
         ####################################################
@@ -339,19 +370,6 @@ if __name__ == '__main__':
             i         = np.argmin(np.array(fids_trans))
             info['fidelity'] = fids[i]
             info['fidelity_trans'] = fids_trans[i]
-        
-        # output
-        ########
-        if params['output_file'] is not None and params['output_file'] is not False :
-            filename = params['output_file']
-        else :
-            filename = args.filename
-        
-        outputdir = os.path.split(os.path.abspath(filename))[0]
-
-        # mkdir if it does not exist
-        if not os.path.exists(outputdir):
-            os.makedirs(outputdir)
         
         print('writing to:', filename)
         f = h5py.File(filename)
@@ -401,3 +419,12 @@ if __name__ == '__main__':
             shutil.copy(args.config, outputdir)
         except Exception as e :
             print(e)
+
+        
+    # dump the Os to test merging
+    fnamO = os.path.join(outputdir, 'O_'+str(rank)+'.h5')
+    fO    = h5py.File(fnamO)
+    if 'O' in fO:
+        del fO['O']
+    fO['O'] = O0
+    fO.close()

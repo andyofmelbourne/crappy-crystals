@@ -112,19 +112,22 @@ def chesh_scan_P212121(diff, unit_cell, sin, D, B, mask):
 def chesh_scan_P212121_wrap(x):
     return chesh_scan_P212121(*x)
 
-def chesh_scan_w_flips(diff, unit_cell, sin, D, B, mask, spacegroup = 'P212121'):
+def chesh_scan_w_flips(diff, unit_cell, sin, D, B, mask, single_thread=True, spacegroup = 'P212121'):
     if spacegroup == 'P212121':
         # slices gives us the 8 possibilities
         slices = [(slice(None, None, 2*((rank//4)%2)-1), slice(None, None, 2*((rank//2)%2)-1), slice(None, None, 2*((rank)%2)-1)) for rank in range(8)]
         
-        from multiprocessing import Pool
         import itertools
-        
         args = zip( itertools.repeat(diff), itertools.repeat(unit_cell), [sin[s].copy() for s in slices], \
                                itertools.repeat(D), itertools.repeat(B), itertools.repeat(mask))
          
-        pool = Pool()
-        res    = pool.map(chesh_scan_P212121_wrap, args) 
+        if single_thread :
+            res = [chesh_scan_P212121_wrap(arg) for arg in args]
+        else :
+            from multiprocessing import Pool
+            pool = Pool()
+            res    = pool.map(chesh_scan_P212121_wrap, args) 
+        
         errors = np.array([i[0] for i in res])
         shifts = np.array([i[1] for i in res])
         
