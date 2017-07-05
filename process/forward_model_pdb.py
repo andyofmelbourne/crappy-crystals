@@ -84,6 +84,20 @@ def parse_cmdline_args(default_config='forward_model_pdb.ini'):
     
     return args, params
 
+def get_pdb_mtz(pdbid, dirnam = './temp'):
+    # fetch the pdb info
+    from subprocess import PIPE, Popen
+    import shlex
+    import os
+    dirnam2 = os.path.join(os.path.dirname(os.path.realpath(__file__)), dirnam)
+    cmd = 'mkdir ' + dirnam2
+    p = Popen(shlex.split(cmd))
+    p.wait()
+    
+    cmd = 'phenix.fetch_pdb --mtz ' + pdbid
+    p = Popen(shlex.split(cmd), cwd=dirnam2)
+    p.wait()
+
 def make_map_ccp4(pdbid, res=5.):
     # make the maps.params file
     dirnam = os.path.abspath('./temp')
