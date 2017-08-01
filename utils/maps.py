@@ -552,7 +552,7 @@ def choose_N_highest_pixels(array, N, tol = 1.0e-10, maxIters=1000, mapper = Non
         sup = support
         a = array[(max_support > 0) * (support > 0)]
     else :
-        sup = 1
+        sup = True
         a = array[(max_support > 0)]
     
     # search for the cutoff value

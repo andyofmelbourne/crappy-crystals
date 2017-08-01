@@ -177,10 +177,13 @@ def generate_diff(solid_unit, unit_cell, N, sigma, **params):
     
     # define the solid_unit support
     ###############################
-    if io_utils.isValid('support_frac', params):
-        support = padding.expand_region_by(np.abs(solid_unit) > 0., params['support_frac'])
+    if io_utils.isValid('support', params):
+        support = params['support']
     else :
         support = np.abs(solid_unit) > 0.
+    
+    if io_utils.isValid('support_frac', params):
+        support = padding.expand_region_by(support, params['support_frac'])
     
     #solid_unit = np.random.random(support.shape)*support + 0J
     
@@ -239,29 +242,47 @@ def generate_diff(solid_unit, unit_cell, N, sigma, **params):
     ###########################
     if io_utils.isValid('photons', params) :
         # R-scale data
-        B_rscale, R_scale = add_noise_3d.R_scale_data(B)
-        D_rscale, R_scale = add_noise_3d.R_scale_data(D)
+        if not io_utils.isValid('turn_off_bragg', params) :
+            B_rscale, R_scale = add_noise_3d.R_scale_data(B)
+            B_norm    = np.sum(B_rscale)
+        else :
+            B_norm    = 0
+        
+        if not io_utils.isValid('turn_off_diffuse', params) :
+            D_rscale, R_scale = add_noise_3d.R_scale_data(D)
+            D_norm    = np.sum(D_rscale)
+        else :
+            D_norm    = 0
         
         # add noise
-        B_norm    = np.sum(B_rscale)
-        D_norm    = np.sum(D_rscale)
         norm      = B_norm + D_norm
-        B_photons = params['photons'] * B_norm / norm
-        D_photons = params['photons'] * D_norm / norm
-        B_rscale = add_noise_3d.add_poisson_noise(B_rscale, B_photons)
-        D_rscale = add_noise_3d.add_poisson_noise(D_rscale, D_photons)
+
+        # R-scale data
+        if not io_utils.isValid('turn_off_bragg', params) :
+            B_photons = params['photons'] * B_norm / norm
+            B_rscale = add_noise_3d.add_poisson_noise(B_rscale, B_photons)
+            # un-scale 
+            B_rscale /= R_scale
+            # renormalse
+            B = B_rscale / np.sum(B_rscale) * Bsum
+        else :
+            B_photons = 0
+        
+        if not io_utils.isValid('turn_off_diffuse', params) :
+            D_photons = params['photons'] * D_norm / norm
+            D_rscale = add_noise_3d.add_poisson_noise(D_rscale, D_photons)
+            # un-scale 
+            D_rscale /= R_scale
+            # renormalse
+            D = D_rscale / np.sum(D_rscale) * Dsum
+        else :
+            D_photons = 0
+        
         print('\nnumber of photons for Bragg   diffraction:', B_photons)
         print('number of photons for diffuse diffraction:', D_photons)
         print('total number of photons for diffraction  :', params['photons'])
-        assert((B_photons + D_photons) == params['photons'])
+        assert( np.abs((B_photons + D_photons) - params['photons']) < 1)
         
-        # un-scale 
-        B_rscale /= R_scale
-        D_rscale /= R_scale
-        
-        # renormalse
-        B = B_rscale / np.sum(B_rscale) * Bsum
-        D = D_rscale / np.sum(D_rscale) * Dsum
         diff = B + D
     else :
         diff = B + D

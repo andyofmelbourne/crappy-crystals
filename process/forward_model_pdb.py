@@ -429,7 +429,7 @@ if __name__ == '__main__':
         raise ValueError('output_file in the ini file is not valid, or the filename was not specified on the command line')
     
     # make the map using phenix (generates a ccp4 file) 
-    ccp4_fnam, pdb_fnam = make_map_ccp4(params['pdb_id'], np.max(params['pixel_size_ang']))
+    ccp4_fnam, pdb_fnam = make_map_ccp4(params['pdb_id'], 2*np.max(params['pixel_size_ang']))
 
     # get the solid_unit volume on the desired grid
     density, mask, geom = get_mol_density_ccp4_pdb(ccp4_fnam, pdb_fnam, params['cut_radius_ang'], params['pixel_size_ang'])
@@ -444,6 +444,42 @@ if __name__ == '__main__':
     sigma      = params['sigma']
     del params['n']
     del params['sigma']
+
+    support = np.abs(solid_unit)>0.
+
+    if params['support_sigma'] is not None :
+        print('shrinking the support')
+        def make_exp2(sigma, shape, spacing = [1.,1.,1.]):
+            # make the B-factor thing
+            i, j, k = np.meshgrid(np.fft.fftfreq(shape[0], spacing[0]), \
+                                  np.fft.fftfreq(shape[1], spacing[1]), \
+                                  np.fft.fftfreq(shape[2], spacing[2]), indexing='ij')
+            if sigma is np.inf :
+                print('sigma is inf setting exp = 0')
+                exp     = np.zeros(i.shape, dtype=np.float)
+            elif sigma is 0 :
+                print('sigma is 0 setting exp = 1')
+                exp     = np.ones(i.shape, dtype=np.float)
+            else :
+                try :
+                    exp = np.exp(-2. * np.pi**2 * ((sigma[0]*i)**2 +(sigma[1]*j)**2+(sigma[2]*k)**2))
+                except TypeError: 
+                    exp = np.exp(-2. * sigma**2 * np.pi**2 * (i**2 + j**2 + k**2))
+            return exp
+
+        exp = make_exp2(params['support_sigma'], support.shape)
+        
+        s = solid_unit.copy()
+
+        for i in range(3):
+            print(i)
+            # blur
+            s2 = np.fft.ifftn(np.fft.fftn(np.abs(s)**2)*exp)
+            # threshold
+            support = (s2.real > 0.01*s2.real.max())
+            s = s * support
+
+    solid_unit   *= support
 
     voxel_support = np.abs(solid_unit)>0.
     
@@ -461,11 +497,17 @@ if __name__ == '__main__':
         voxel_support[overlap] = 0
         print('removing overlap:', len(overlap[0]), 'pixels, voxels=',np.sum(voxel_support) )
         
-    solid_unit   *= voxel_support
-    
+    print(type(support), type(voxel_support))
+    print(support.dtype, voxel_support.dtype)
+    support      *= voxel_support
+    solid_unit   *= support
+
     # calculate the diffraction data and metadata
     #############################################
+    params['support'] = support
     diff, info = forward_sim.generate_diff(solid_unit, unit_cell, N, sigma/params['pixel_size_ang'], **params)
+    
+    solid_unit   *= info['support']
     
     info['unit_cell_pixels'] = unit_cell
     info['unit_cell_ang']    = geom['abc']

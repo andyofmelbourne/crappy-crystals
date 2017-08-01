@@ -47,11 +47,17 @@ def chesh_scan_P212121(diff, unit_cell, sin, D, B, mask):
     thresh = np.percentile(B[B>0], 90.) 
     #Bragg_mask = B > 1.0e-1 * B[0,0,0]
     Bragg_mask = B > thresh
+    
+    # keep only one orthant
+    s = Bragg_mask.shape
+    #Bragg_mask[s[0]//2:, :, :] = False
+    #Bragg_mask[:, s[1]//2:, :] = False
+    #Bragg_mask[:, :, s[2]//2:] = False
     print(np.sum(Bragg_mask), 'Bragg peaks used for cheshire scan')
     
     # symmetrise it so that we have all pairs in the point group
-    Bragg_mask = sym_ops.solid_syms_Fourier(Bragg_mask, apply_translation=False)
-    Bragg_mask = np.sum(Bragg_mask, axis=0)>0
+    #Bragg_mask = sym_ops.solid_syms_Fourier(Bragg_mask, apply_translation=False)
+    #Bragg_mask = np.sum(Bragg_mask, axis=0)>0
 
     #def solid_syms_Fourier_masked(self, solid, i, j, k, apply_translation = True, syms = None):
     
@@ -116,6 +122,7 @@ def chesh_scan_w_flips(diff, unit_cell, sin, D, B, mask, single_thread=True, spa
     if spacegroup == 'P212121':
         # slices gives us the 8 possibilities
         slices = [(slice(None, None, 2*((rank//4)%2)-1), slice(None, None, 2*((rank//2)%2)-1), slice(None, None, 2*((rank)%2)-1)) for rank in range(8)]
+        slices = slices[::2]
         
         import itertools
         args = zip( itertools.repeat(diff), itertools.repeat(unit_cell), [sin[s].copy() for s in slices], \
