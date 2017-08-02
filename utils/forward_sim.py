@@ -203,8 +203,7 @@ def generate_diff(solid_unit, unit_cell, N, sigma, **params):
     # make the lattice
     ##################
     lattice = symmetry_operations.make_lattice_subsample(unit_cell, solid_unit.shape, N)
-    # normalise by the number of unit cells
-    lattice = lattice / N**3
+    print('sum lattice:', np.sum(lattice))
     
     if io_utils.isValid('lattice_blur', params) :
         import scipy.ndimage

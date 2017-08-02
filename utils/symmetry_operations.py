@@ -124,7 +124,7 @@ class P212121():
         
         self.Pat_sym_ops   = 8
         self.unitcell_size = unitcell_size
-        self.Cheshire_cell = tuple(np.rint(self.unitcell_size/2.).astype(np.int) + 1)
+        self.Cheshire_cell = tuple(np.rint(self.unitcell_size/2.).astype(np.int))
         self.det_shape     = det_shape
         
         # keep an array for the 4 symmetry related coppies of the solid unit
@@ -958,7 +958,7 @@ def make_lattice_subsample(u_pix, shape, N = None, subsamples=50):
         infinite = False
     
     # add the plane waves along each axis
-    for k in range(1, N):
+    for k in range(0, N):
         a   = k * np.array(u_pix)
         l0 += np.exp(2.0J * np.pi * a[0] * q0)
         l1 += np.exp(2.0J * np.pi * a[1] * q1)
@@ -976,7 +976,12 @@ def make_lattice_subsample(u_pix, shape, N = None, subsamples=50):
     l = np.multiply.outer(l, l2) / float(subsamples**3)
     if infinite :
         l = (l > 0.5 * l.max()).astype(np.float32)
-
+      
+    # normalise the lattice function to the 
+    # number of pixels
+    if N > 0 :
+        l *= l.size / np.sum(l)
+    
     return l 
 
 def make_lattice_analytic(u_pix, shape, N = None):
