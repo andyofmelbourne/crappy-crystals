@@ -95,7 +95,7 @@ def ERA(iters, **args):
     eMods     = []
     eCons     = []
 
-    modes  = mapper.modes
+    modes  = mapper.modes.copy()
 
     if iters > 0 and rank == 0 :
         print('\n\nalgrithm progress iteration convergence modulus error')
@@ -115,7 +115,7 @@ def ERA(iters, **args):
         #eMod    = mapper.l2norm(modes1, modes0)
         #eMod    = mapper.Emod(modes)
         #eMod    = mapper.eMod
-        eMod    = mapper.Emod(modes)
+        eMod    = mapper.Emod(modes.copy())
         #eMod = 0
         
         dO   = modes - modes_mod
@@ -126,14 +126,21 @@ def ERA(iters, **args):
         eMods.append(eMod)
         eCons.append(eCon)
     
+        mapper.next_iter(modes.copy(), i)
+        #try :
+        #    mapper.next_iter(modes.copy(), i)
+        #except Exception as e :
+        #    if i == 0 :
+        #        print(e)
+    
     info = {}
     info['eMod']  = eMods
     info['eCon']  = eCons
     
     info.update(mapper.finish(mapper.Psup(modes)))
     
-    O = mapper.O
-    return O, info
+    O = info['O']
+    return O, mapper, info
 
 
 def update_progress(progress, algorithm, i, emod, esup):

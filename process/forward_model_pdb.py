@@ -429,7 +429,7 @@ if __name__ == '__main__':
         raise ValueError('output_file in the ini file is not valid, or the filename was not specified on the command line')
     
     # make the map using phenix (generates a ccp4 file) 
-    ccp4_fnam, pdb_fnam = make_map_ccp4(params['pdb_id'], 2*np.max(params['pixel_size_ang']))
+    ccp4_fnam, pdb_fnam = make_map_ccp4(params['pdb_id'], 1.0*np.max(params['pixel_size_ang']))
 
     # get the solid_unit volume on the desired grid
     density, mask, geom = get_mol_density_ccp4_pdb(ccp4_fnam, pdb_fnam, params['cut_radius_ang'], params['pixel_size_ang'])
@@ -515,11 +515,14 @@ if __name__ == '__main__':
     
     # calculate the constraint ratio
     ################################
-    omega_con, omega_Bragg, omega_global  = calculate_constraint_ratio(info['support'], params['space_group'], unit_cell)
+    omega_con, omega_Bragg, omega_global  = calculate_constraint_ratio(info['support'], params['space_group'], np.rint(unit_cell).astype(np.int))
     info['omega_continuous'] = omega_con
     info['omega_Bragg']      = omega_Bragg
     info['omega_global']     = omega_global
 
+    #import padding
+    #info['support'] = padding.expand_region_by(info['support'], 3.)
+    
     # output
     ########
     outputdir = os.path.split(os.path.abspath(args.filename))[0]

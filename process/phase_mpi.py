@@ -169,6 +169,45 @@ def centre_array(O):
     out = scipy.ndimage.interpolation.shift(O.real, shift, mode='wrap', order=1) + 1J*scipy.ndimage.interpolation.shift(O.imag, shift, mode='wrap', order=1)
     return out
 
+def calc_fid(a,b):
+    z = b-a
+    return np.sum( (z*z.conj()).real ) 
+
+def post_align(O1, O2):
+    o1 = np.fft.rfftn(O1.real)
+    o2 = np.fft.rfftn(O2.real)
+    
+    # make the qspace grid
+    qi = np.fft.fftfreq(O1.shape[0])
+    qj = np.fft.fftfreq(O1.shape[1])
+    qk = np.fft.fftfreq(O1.shape[2])[:O1.shape[2]//2 + 1]
+    
+    I = np.linspace(-1, 1, 11)
+    J = np.linspace(-1, 1, 11)
+    K = np.linspace(-1, 1, 11)
+    fids = np.zeros( (len(I), len(J), len(K)), dtype=np.float)
+    for ii, i in enumerate(I):
+        prI = np.exp(- 2J * np.pi * (i * qi))
+        for jj, j in enumerate(J):
+            prJ = np.exp(- 2J * np.pi * (j * qj))
+            for kk, k in enumerate(K):
+                prK = np.exp(- 2J * np.pi * (k * qk))
+                
+                phase_ramp = np.multiply.outer(np.multiply.outer(prI, prJ), prK)
+                fids[ii, jj, kk] = calc_fid(o1, o2 * phase_ramp)
+    
+    l = np.argmin(fids)
+    i, j, k = np.unravel_index(l, fids.shape)
+    print('lowest error at:', i,j,k, fids[i,j,k])
+    i, j, k = I[i], J[j], K[k]
+    
+    prI = np.exp(- 2J * np.pi * (i * qi))
+    prJ = np.exp(- 2J * np.pi * (j * qj))
+    prK = np.exp(- 2J * np.pi * (k * qk))
+    phase_ramp = np.multiply.outer(np.multiply.outer(prI, prJ), prK)
+    
+    return np.fft.irfftn(o2 * phase_ramp)
+
 def align(O1, O2, order=1):
     con  = np.fft.ifftn( np.fft.fftn(O1) * np.fft.fftn(O2).conj() )
     rmin = np.argmax( (con * con.conj()).real )
@@ -210,6 +249,7 @@ def align_Os(O0, O):
         O0 = O0.conj()
     
     O = align_any_orientation(O0, O)
+    O = post_align(O0.real, O.real) + 0J
     return O
 
 if __name__ == '__main__':
@@ -329,10 +369,9 @@ if __name__ == '__main__':
     # get everyone to align their object with respect to the first
     O0 = comm.bcast(O, root=i)
 
-    print('merging Os...',)
+    print('merging Os...', rank)
     O = align_Os(O0, O)
     O = comm.gather(O) 
-    print('Done.')
     
     # output
     ########

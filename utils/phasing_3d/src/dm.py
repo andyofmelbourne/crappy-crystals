@@ -155,7 +155,7 @@ def DM(iters, beta = 1, **args):
     
     modes  = mapper.modes
     
-    modes_sup = mapper.Psup(modes)
+    modes_sup = mapper.Psup(modes.copy())
     modes_mod = None
 
     if iters > 0  and rank==0:
@@ -177,21 +177,26 @@ def DM(iters, beta = 1, **args):
             #eCon    = mapper.l2norm(modes0, modes)
             
             # f* = Ps f_i = PM (2 Ps f_i - f_i)
-            modes_sup = mapper.Psup(modes)
+            modes_sup = mapper.Psup(modes.copy())
 
             dO   = mapper.O - O0
             eCon = mapper.l2norm(dO, O0)
             
-            eMod = mapper.Emod(modes_sup)
+            eMod = mapper.Emod(modes_sup.copy())
             #eMod = mapper.eMod
             
             if rank == 0 : era.update_progress(i / max(1.0, float(iters-1)), 'DM', i, eCon, eMod )
             
             eMods.append(eMod)
             eCons.append(eCon)
+    
+            try :
+                mapper.next_iter(modes_sup.copy(), i)
+            except Exception as e :
+                print(e)
 
     else :
-        modes_mod = mapper.Pmod(modes)
+        modes_mod = mapper.Pmod(modes.copy())
         for i in range(iters) :
             
             # reference
@@ -209,8 +214,8 @@ def DM(iters, beta = 1, **args):
             #eCon    = mapper.l2norm(modes0, modes)
             
             # f* = Ps f_i = PM (2 Ps f_i - f_i)
-            modes_sup = mapper.Psup(modes)
-            modes_mod = mapper.Pmod(modes)
+            modes_sup = mapper.Psup(modes.copy())
+            modes_mod = mapper.Pmod(modes.copy())
             
             dO   = mapper.O - O0
             eCon = mapper.l2norm(dO, O0)
@@ -223,6 +228,12 @@ def DM(iters, beta = 1, **args):
             
             eMods.append(eMod)
             eCons.append(eCon)
+            
+            mapper.next_iter(modes_sup.copy(), i)
+            #try :
+            #    mapper.next_iter(modes_sup.copy(), i)
+            #except Exception as e :
+            #    print(e)
     
     info = {}
     info['eMod']  = eMods
@@ -234,8 +245,8 @@ def DM(iters, beta = 1, **args):
     b = mapper.Psup(modes_mod - 1/beta * (modes_mod - modes))
     info.update(mapper.finish(b))
     
-    O = mapper.O
+    O = info['O']
     
-    return O, info
+    return O, mapper, info
 
 

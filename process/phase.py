@@ -32,6 +32,8 @@ import io_utils
 import duck_3D
 import forward_sim
 import phasing_3d
+# testing
+#import maps_gpu as maps
 import maps
 import fidelity
 
@@ -74,7 +76,7 @@ def phase(mapper, iters_str = '100DM 100ERA', beta=1):
     Cheshire_error_map = None
     eMod = []
     eCon = []
-    O = mapper.O
+    O    = mapper.O
     for alg, iters in alg_iters :
         
         print(alg, iters)
@@ -97,7 +99,7 @@ def phase(mapper, iters_str = '100DM 100ERA', beta=1):
     
     # temp
     modes = mapper.Pmod(mapper.modes)
-    O = mapper.object(modes)
+    O     = mapper.object(modes)
     return O, mapper, eMod, eCon, info
 
 def parse_cmdline_args(default_config='phase.ini'):

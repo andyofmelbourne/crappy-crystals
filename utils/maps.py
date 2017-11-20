@@ -240,9 +240,11 @@ class Mapper_ellipse():
         return out
     
     def Imap(self, modes):
-        U  = np.sum(modes, axis=0)
-        I  = self.diffuse_weighting   * np.sum( (modes * modes.conj()).real, axis=0)
-        I += self.unit_cell_weighting * (U * U.conj()).real
+        #U  = np.sum(modes, axis=0)
+        #I  = self.diffuse_weighting   * np.sum( (modes * modes.conj()).real, axis=0)
+        #I += self.unit_cell_weighting * (U * U.conj()).real
+        I  = self.diffuse_weighting   * np.sum( np.abs(modes)**2, axis=0)
+        I += self.unit_cell_weighting * np.abs(np.sum(modes, axis=0))**2
         return I
     
     def Psup(self, modes):
@@ -501,7 +503,6 @@ class Mapper_ellipse():
                                                self.mask, spacegroup = self.sym_ops.spacegroup)
         
         print('\n\nCheshire scan:', shift, 'shift', sl, 'orientation', np.min(errors), 'error')
-        print('\n\nCheshire scan:')
         # now shift the sample and support
         sout = np.roll(solid[sl], shift[0], 0)
         sout = np.roll(sout     , shift[1], 1)
@@ -576,7 +577,7 @@ def choose_N_highest_pixels(array, N, tol = 1.0e-10, maxIters=1000, mapper = Non
         #print(s, s0, s1, e)
         if np.abs(s0 - s1) < tol and np.abs(e) > 0 :
             failed = True
-            print('s0==s1, exiting...', s0, s1)
+            print('s0==s1, exiting...', s0, s1, np.abs(s0 - s1), tol)
             break
         
     S = (array > s) * max_support * sup

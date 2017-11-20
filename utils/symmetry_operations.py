@@ -123,7 +123,7 @@ class P212121():
         self.no_solid_units = 4
         
         self.Pat_sym_ops   = 8
-        self.unitcell_size = unitcell_size
+        self.unitcell_size = np.rint(unitcell_size).astype(np.int)
         self.Cheshire_cell = tuple(np.rint(self.unitcell_size/2.).astype(np.int))
         self.det_shape     = det_shape
         
@@ -198,7 +198,6 @@ class P212121():
             self.make_Ts()
         Ts = np.array([self.translations[iii][(ii,jj,kk)] for iii in range(4)])
         return inds, Ts
-
 
     def solid_syms_Fourier_masked(self, solid, i, j, k, apply_translation = True, syms = None):
         """
@@ -941,14 +940,14 @@ def make_lattice_subsample(u_pix, shape, N = None, subsamples=50):
     # make the q-values along each axis
     shape2 = tuple(np.array(shape)*subsamples)
     #l          = np.zeros(shape, dtype=np.complex64)
-    q0         = np.fft.fftfreq(shape2[0]).astype(np.float32)
-    q1         = np.fft.fftfreq(shape2[1]).astype(np.float32)
-    q2         = np.fft.fftfreq(shape2[2]).astype(np.float32)
+    q0         = np.fft.fftfreq(shape2[0]).astype(np.float64)
+    q1         = np.fft.fftfreq(shape2[1]).astype(np.float64)
+    q2         = np.fft.fftfreq(shape2[2]).astype(np.float64)
     
     # make the lattice functions along each axis
-    l0 = np.zeros(shape2[0], dtype=np.complex64)
-    l1 = np.zeros(shape2[1], dtype=np.complex64)
-    l2 = np.zeros(shape2[2], dtype=np.complex64)
+    l0 = np.zeros(shape2[0], dtype=np.complex128)
+    l1 = np.zeros(shape2[1], dtype=np.complex128)
+    l2 = np.zeros(shape2[2], dtype=np.complex128)
 
     # define the number of lattice points along each axis
     if N is None :
@@ -975,7 +974,7 @@ def make_lattice_subsample(u_pix, shape, N = None, subsamples=50):
     l = np.multiply.outer(l0, l1)
     l = np.multiply.outer(l, l2) / float(subsamples**3)
     if infinite :
-        l = (l > 0.5 * l.max()).astype(np.float32)
+        l = (l > 0.5 * l.max()).astype(np.float64)
       
     # normalise the lattice function to the 
     # number of pixels
