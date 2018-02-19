@@ -337,6 +337,8 @@ def generate_diff(solid_unit, unit_cell, N, sigma, **params):
         print('##########################')
         print('Warning: crystal overlap!!')
         print('##########################')
+
+    U = np.fft.ifftn(np.sum(modes, axis=0))
     
     info = {}
     info['beamstop']   = beamstop
@@ -346,7 +348,7 @@ def generate_diff(solid_unit, unit_cell, N, sigma, **params):
     info['lattice']    = lattice
     info['voxels']     = voxels
     info['crystal']    = crystal_ar
-    info['unit_cell']  = unit_cell_ar
+    info['unit_cell']  = U
     info['sym']        = sym_ops
     info['Bragg_weighting']   = Bw
     info['diffuse_weighting'] = Dw

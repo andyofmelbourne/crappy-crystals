@@ -94,6 +94,14 @@ if __name__ == '__main__':
         solid_unit = np.roll(solid_unit, params['position'][1], 1)
         solid_unit = np.roll(solid_unit, params['position'][2], 2)
         
+    # if params['solid_unit'] is a path to a h5 file then use that
+    elif params['solid_unit'][-3:] == '.h5':
+        f = h5py.File(params['solid_unit'], 'r')
+        solid_unit = f['solid_unit'][()]
+        f.close()
+
+        # Hack! mask it 
+        solid_unit *= solid_unit.real > 0.05
     else :
         raise ValueError("solid_unit not supported, can only be 'duck' at this point...")
     
@@ -169,3 +177,12 @@ if __name__ == '__main__':
         shutil.copy(args.config, outputdir)
     except Exception as e :
         print(e)
+
+
+    # for testing
+    dxyz = np.array([0.575625, 0.63875, 1.0959375])
+    Uxyz = np.array([36.840, 40.880, 70.140])
+    geom = {'vox': dxyz, 'abc': Uxyz, 'originx': np.array([0,0,-Uxyz[2]])}
+    fnam = 'test_U.ccp4'
+    import write_ccp4
+    write_ccp4.write_ccp4(np.fft.fftshift(info['unit_cell'].real.astype(np.float32)), fnam, geom, SGN=19)
