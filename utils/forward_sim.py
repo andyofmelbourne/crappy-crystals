@@ -332,14 +332,17 @@ def generate_diff(solid_unit, unit_cell, N, sigma, **params):
     print('Simulation: number of voxels in support   :', voxels_sup)
     print('Simulation: solvent fraction (sample)     :', solvent_sample)
     print('Simulation: solvent fraction (support)    :', solvent_support)
+    
+    U = np.fft.ifftn(np.sum(modes, axis=0))
 
-    if np.any(crystal_ar > 1.) :
+    sU = np.sum(np.abs(U)>1.0e-5)
+    sS = voxels
+    if sU < sym_ops.no_solid_units * sS :
         print('##########################')
         print('Warning: crystal overlap!!')
+        print('of', sym_ops.no_solid_units * sS - sU, 'voxels')
         print('##########################')
 
-    U = np.fft.ifftn(np.sum(modes, axis=0))
-    
     info = {}
     info['beamstop']   = beamstop
     info['edges']      = edges
@@ -350,6 +353,7 @@ def generate_diff(solid_unit, unit_cell, N, sigma, **params):
     info['crystal']    = crystal_ar
     info['unit_cell']  = U
     info['sym']        = sym_ops
+    info['modes']      = modes
     info['Bragg_weighting']   = Bw
     info['diffuse_weighting'] = Dw
     info['Bragg_diffraction']   = B

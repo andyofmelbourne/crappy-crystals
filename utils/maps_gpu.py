@@ -20,7 +20,6 @@ from functools import reduce
 import padding
 import add_noise_3d
 import io_utils
-import maps
 
 import pyximport; pyximport.install()
 #from ellipse_2D_cython import project_2D_Ellipse_arrays_cython
@@ -345,7 +344,7 @@ class Mapper_ellipse():
             
             intensity = (O * O.conj()).real.astype(np.float64)
             print('number of pixels greater than zero in input:', np.sum(intensity>0))
-            self.voxel_support = maps.choose_N_highest_pixels(intensity, self.voxel_number, support = self.support)
+            self.voxel_support = choose_N_highest_pixels(intensity, self.voxel_number, support = self.support)
         else :
             self.voxel_number  = False
             self.voxel_support = self.support.copy()
@@ -433,42 +432,79 @@ class Mapper_ellipse():
         if self.voxel_number and (iter % self.support_update_freq == 0) :
             # do one Pmod 
             modes = self.Pmod(modes)
-            O = self.object(modes)
+            self.O = self.sym_ops.av_solid_real(self.O, modes, allpix=True)
             
+            O = self.O.get()
+
+            # blur O
+            # bias low angle scatter for voxel support update
+            if self.voxel_sup_blur is not None and self.voxel_sup_blur > 0.01 :
+                print('\n\nbluring sample...')
+                import scipy.ndimage.filters
+                from scipy.ndimage.filters import gaussian_filter
+                O = gaussian_filter(O.real, self.voxel_sup_blur, mode='wrap') + 1J * gaussian_filter(O.imag, self.voxel_sup_blur, mode='wrap')
+                
+            if self.voxel_sup_blur_frac is not None and self.voxel_sup_blur > 0.01 :
+                self.voxel_sup_blur *= self.voxel_sup_blur_frac
+                print('\n\nblur factor...', self.voxel_sup_blur, self.voxel_sup_blur_frac)
+            
+    
             intensity = (O * O.conj()).real
+            modes = self.sym_ops.solid_syms_real(gpuarray.to_gpu(np.ascontiguousarray(O)), modes)
             
+            U = modes.get()
+            U = (U * U.conj()).real
+            
+            # make the crystal
+            Crystal = []
+            for i in [0, self.sym_ops.unitcell_size[0]]:
+                for j in [0, self.sym_ops.unitcell_size[1]]:
+                    for k in [0, self.sym_ops.unitcell_size[2]]:
+                        for ii in range(U.shape[0]):
+                            Crystal.append(np.roll(U[ii], (i,j,k), (0,1,2)))
+            
+            syms = np.array(Crystal)
+            
+            """
             # bias low angle scatter for voxel support update
             if self.voxel_sup_blur is not None and self.voxel_sup_blur > 0.01 :
                 print('\n\nbluring sample...')
                 import scipy.ndimage.filters
                 from scipy.ndimage.filters import gaussian_filter
                 intensity = gaussian_filter(intensity, self.voxel_sup_blur, mode='wrap')
-                voxel_number_temp = int((1+self.voxel_sup_blur) * self.voxel_number)
+                #voxel_number_temp = int((1+self.voxel_sup_blur) * self.voxel_number)
+                # testing
+                voxel_number_temp = self.voxel_number
             else :
                 voxel_number_temp = self.voxel_number
             
             if self.voxel_sup_blur_frac is not None and self.voxel_sup_blur > 0.01 :
                 self.voxel_sup_blur *= self.voxel_sup_blur_frac
                 print('\n\nnew blur sigma value...', self.voxel_sup_blur, self.voxel_sup_blur_frac, voxel_number_temp)
+            """
             
+            # testing
+            #if self.voxel_sup_blur_frac is not None and self.voxel_sup_blur < 0.5 :
+            #    self.voxel_sup_blur = 0.5
+                
             if self.overlap == 'unit_cell' :
                 print('\n\nupdating support with no unit_cell overlap')
-                self.voxel_support = maps.choose_N_highest_pixels(intensity, voxel_number_temp, \
-                                     support = self.support, mapper = self.sym_ops.solid_syms_real)
+                self.voxel_support = choose_N_highest_pixels(intensity, self.voxel_number, \
+                                     support = self.support, syms = syms)
                 #self.voxel_support = voxel_number_support_single_connected_region(intensity, self.voxel_number, init_sup=self.voxel_support)
             
             elif self.overlap == 'crystal' :
                 print('\n\nupdating support with no crystal overlap')
                 # try using the crystal mapping instead of the unit-cell mapping
-                self.voxel_support = maps.choose_N_highest_pixels(intensity, voxel_number_temp, \
-                                     support = self.support, mapper = self.sym_ops.solid_to_crystal_real)
+                self.voxel_support = choose_N_highest_pixels(intensity, self.voxel_number, \
+                                     support = self.support, syms = self.sym_ops.solid_to_crystal_real)
             elif self.overlap is None :
                 print('\n\nupdating support')
-                self.voxel_support = maps.choose_N_highest_pixels(intensity, voxel_number_temp, \
-                                     support = self.support, mapper = None)
+                self.voxel_support = choose_N_highest_pixels(intensity, self.voxel_number, \
+                                     support = self.support, syms = None)
             else :
                 raise ValueError("overlap must be one of 'unit_cell', 'crystal' or None")
-            
+
             # update sym_ops
             self.sym_ops.update_sup(self.voxel_support)
         
@@ -551,9 +587,17 @@ class Mapper_ellipse():
         err is deprecated
         """
         #scan_grid = [range(1), range(1), range(1)]
-        errors, shift = chesh_scan_P212121(self.amp**2, self.sym_ops.unitcell_size, solid, 
+        # testing
+        print('\n\nbluring sample...')
+        import scipy.ndimage.filters
+        from scipy.ndimage.filters import gaussian_filter
+        O = gaussian_filter(solid.copy().real, 0.5, mode='wrap') + 0J
+
+        scan_grid = [np.arange(-16, 16, 1) for i in range(3)]
+        
+        errors, shift = chesh_scan_P212121(self.amp**2, self.sym_ops.unitcell_size, O, 
                                            self.diffuse_weighting, self.unit_cell_weighting, 
-                                           self.mask, scan_grid=None, check_finite=False)
+                                           self.mask, scan_grid=scan_grid, check_finite=False)
         
         print('\n\nCheshire scan:', shift, 'shift', np.min(errors), 'error')
         #print('\n\nchecking the inverted object...')
@@ -692,3 +736,79 @@ def chesh_scan_P212121(diff, unit_cell, sin, D, B, mask, scan_grid=None, Bragg_m
         errors, (i, j, k) = chesh_scan_P212121(diff, unit_cell, sin, D, B, mask, scan_grid=[I, J, K], Bragg_mask=Bragg_mask, check_finite=False)
       
     return errors, (i, j, k)
+
+def choose_N_highest_pixels(array, N, tol = 1.0e-10, maxIters=1000, syms = None, support = None):
+    """
+    Use bisection to find the root of
+    e(x) = \sum_i (array_i > x) - N
+
+    then return (array_i > x) a boolean mask
+
+    This is faster than using percentile (surprising)
+
+    If support is not None then values outside the support
+    are ignored. 
+    """
+    
+    # no overlap constraint
+    if syms is not None :
+        # if array is not the maximum value
+        # of the M symmetry related units 
+        # then do not update 
+        max_support = syms[0] > ((1-tol) * np.max(syms[1:], axis=0))
+    else :
+        max_support = np.ones(array.shape, dtype = np.bool)
+    
+    if support is not None and support is not 1 :
+        sup = support
+        a = array[(max_support > 0) * (support > 0)]
+    else :
+        sup = True
+        a = array[(max_support > 0)]
+    
+    # search for the cutoff value
+    s0 = array.max()
+    s1 = array.min()
+    
+    failed = False
+    for i in range(maxIters):
+        s = (s0 + s1) / 2.
+        e = np.sum(a > s) - N
+          
+        if e == 0 :
+            #print('e==0, exiting...')
+            break
+        
+        if e < 0 :
+            s0 = s
+        else :
+            s1 = s
+
+        #print(s, s0, s1, e)
+        if np.abs(s0 - s1) < tol and np.abs(e) > 0 :
+            failed = True
+            print('s0==s1, exiting...', s0, s1, np.abs(s0 - s1), tol)
+            break
+        
+    S = (array > s) * max_support * sup
+    
+    # if failed is True then there are a lot of 
+    # entries in a that equal s
+    
+    if False :
+    #if failed :
+        print('failed, sum(max_support), sum(S), voxels, pixels>0:',np.sum(max_support), np.sum(S), N, np.sum(array>0), len(a>0))
+        # if S is less than the 
+        # number of voxels then include 
+        # some of the pixels where array == s
+        count      = np.sum(S)
+        ii, jj, kk = np.where((np.abs(array-s)<=tol) * (max_support * sup > 0))
+        l          = N - count
+        print(count, N, l, len(ii))
+        if l > 0 :
+            S[ii[:l], jj[:l], kk[:l]]    = True
+        else :
+            S[ii[:-l], jj[:-l], kk[:-l]] = False
+    
+    #print('number of pixels in support:', np.sum(S), i, s, e)
+    return S

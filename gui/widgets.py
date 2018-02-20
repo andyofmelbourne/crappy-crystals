@@ -535,7 +535,7 @@ class Forward_model_widget(QtGui.QWidget):
         
         # plots
         #######
-        self.crystal_path = '/forward_model/crystal'
+        self.crystal_path = '/forward_model/unit_cell'
         self.diff_path = '/forward_model/data'
         self.displayW = self.display(init=True)
         
@@ -610,22 +610,13 @@ class Forward_model_widget(QtGui.QWidget):
             # real-space crystal view 
             #########################
             #cryst = self.f['/forward_model/solid_unit'][()].real
-            cryst = np.abs(self.f[self.crystal_path][()])
-            #cryst = np.fft.fftshift(cryst)
-            # add 10 pix padding
-            padd = np.zeros((10, cryst.shape[0]), dtype=cryst.real.dtype)
-            t = (np.sum(cryst,axis=0), padd, np.sum(cryst,axis=1), padd, np.sum(cryst,axis=2))
-            #cryst = reduce(np.multiply.outer, [np.ones((128,)), np.ones((128,)),np.arange(128)])
-            t = (np.sum(cryst,axis=0), padd, np.sum(cryst,axis=1), padd, np.sum(cryst,axis=2))
-            t = np.concatenate(t, axis=0)
+            cryst = np.real(self.f[self.crystal_path][()])
+            t = concatenate_projections(np.fft.fftshift(cryst), pad=10)
             
             # diffraction volume view 
             #########################
-            diff_h5 = self.f[self.diff_path]
-            
-            diff = [np.fft.fftshift(diff_h5[0])[:, ::-1], np.fft.fftshift(diff_h5[:, 0, :])[:,::-1], np.fft.fftshift(diff_h5[:, :, 0])[:,::-1]]
-            tt = (diff[0], padd, diff[1], padd, diff[2])
-            tt = np.concatenate(tt, axis=0)**0.2
+            diff_h5 = self.f[self.diff_path][()]
+            tt = concatenate_slices(diff_h5, pad=10, fftshifted=True)**0.2
              
             if init is False :
                 print('updating image, init = False')
@@ -791,7 +782,7 @@ class Phase_widget(QtGui.QWidget):
         # plots
         #######
         #self.crystal_path = '/phase/crystal'
-        self.crystal_path = '/phase/solid_unit'
+        self.crystal_path = '/phase/unit_cell'
         self.diff_path    = '/phase/diff'
         self.displayW     = self.display(init=True)
         

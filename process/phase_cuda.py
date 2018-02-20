@@ -101,6 +101,7 @@ def phase(mapper, iters_str = '100DM 100ERA', beta=1):
     if Cheshire_error_map is not None :
         info['Cheshire_error_map'] = Cheshire_error_map
     
+    info['unit_cell'] = np.sum(mapper.modes.get(), axis=0)
     # temp
     #modes = info['modes'] #mapper.Pmod(mapper.modes)
     #O     = mapper.object(modes)

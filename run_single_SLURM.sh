@@ -28,7 +28,7 @@ echo "source /etc/profile.d/modules.sh" >> $SLURMFILE
 echo "module load anaconda/2" >> $SLURMFILE
 echo "source activate phasing" >> $SLURMFILE
 
-CMD="mpirun -np 64 python process/phase_mpi.py -f hdf5/${1}/pdb.h5 -c hdf5/${1}/phase.ini"
+CMD="mpirun -np 64 python process/phase_mpi.py -f hdf5/${1}/${1}.h5 -c hdf5/${1}/phase.ini"
 echo $CMD
 echo $CMD >> $SLURMFILE
 
